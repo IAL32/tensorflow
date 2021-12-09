@@ -23,6 +23,7 @@ limitations under the License.
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/io/zlib_compression_options.h"
 #include "tensorflow/core/lib/io/zlib_inputstream.h"
+#include "tensorflow/core/lib/io/zstd/zstd_compression_options.h"
 
 namespace tensorflow {
 namespace {
@@ -74,11 +75,12 @@ class DecodeCompressedOp : public OpKernel {
       : OpKernel(context) {
     OP_REQUIRES_OK(context,
                    context->GetAttr("compression_type", &compression_type_));
-    OP_REQUIRES(context,
-                (compression_type_.empty() || compression_type_ == "ZLIB" ||
-                 compression_type_ == "GZIP"),
-                errors::InvalidArgument(
-                    "Only ZLIB, GZIP or NONE are supported compressions"));
+    OP_REQUIRES(
+        context,
+        (compression_type_.empty() || compression_type_ == "ZLIB" ||
+         compression_type_ == "GZIP" || compression_type == "ZSTD"),
+        errors::InvalidArgument(
+            "Only ZLIB, GZIP, ZSTD or NONE are supported compressions"));
   }
 
   void Compute(OpKernelContext* context) override {
@@ -95,6 +97,10 @@ class DecodeCompressedOp : public OpKernel {
       for (int64 i = 0; i < bytes_flat.size(); i++) {
         output_flat(i) = bytes_flat(i);
       }
+    } else if (compression_type_ == "ZSTD") {
+      const io::ZstdCompressionOptions zlib_options =
+          io::ZstdCompressionOptions::DEFAULT();
+      errors::Unimplemented("Compressio option for ZSTD not implemented yet");
     } else {
       const io::ZlibCompressionOptions zlib_options =
           compression_type_ == "ZLIB" ? io::ZlibCompressionOptions::DEFAULT()

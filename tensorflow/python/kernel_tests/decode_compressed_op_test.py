@@ -29,7 +29,8 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import parsing_ops
 from tensorflow.python.platform import test
 
-
+# FIXME: @IAL32
+# Add ZSTD?
 class DecodeCompressedOpTest(test.TestCase):
 
   def _compress(self, bytes_in, compression_type):

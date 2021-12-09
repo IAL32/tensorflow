@@ -63,6 +63,8 @@ _TEXT = b"""Gaily bedight,
     'If you seek for Eldorado!'
     """
 
+# FIXME: @IAL32
+# Add ZSTD?
 
 class TFCompressionTestCase(test.TestCase):
   """TFCompression Test"""

@@ -25,7 +25,6 @@ limitations under the License.
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "third_party/eigen3/unsupported/Eigen/CXX11/FixedPoint"
 #include "tensorflow/core/common_runtime/device.h"
 #include "tensorflow/core/common_runtime/device_factory.h"
 #include "tensorflow/core/common_runtime/device_mgr.h"
@@ -79,6 +78,7 @@ limitations under the License.
 #include "tensorflow/core/public/session_options.h"
 #include "tensorflow/core/public/version.h"
 #include "tensorflow/core/util/tensor_slice_reader_cache.h"
+#include "third_party/eigen3/unsupported/Eigen/CXX11/FixedPoint"
 
 namespace tensorflow {
 namespace data {
@@ -89,6 +89,8 @@ string ToString(CompressionType compression_type) {
       return "ZLIB";
     case CompressionType::GZIP:
       return "GZIP";
+    case CompressionType::ZSTD:
+      return "ZSTD";
     case CompressionType::RAW:
       return "RAW";
     case CompressionType::UNCOMPRESSED:
@@ -109,6 +111,18 @@ io::ZlibCompressionOptions GetZlibCompressionOptions(
       LOG(WARNING) << "ZlibCompressionOptions does not have an option for "
                    << ToString(compression_type);
       return io::ZlibCompressionOptions::DEFAULT();
+  }
+}
+
+io::ZstdCompressionOptions GetZstdCompressionOptions(
+    CompressionType compression_type) {
+  switch (compression_type) {
+    case CompressionType::ZSTD:
+      return io::ZstdCompressionOptions::DEFAULT();
+    case CompressionType::UNCOMPRESSED:
+      LOG(WARNING) << "ZstdCompressionOptions does not have an option for "
+                   << ToString(compression_type);
+      return io::ZstdCompressionOptions::DEFAULT();
   }
 }
 
@@ -135,6 +149,9 @@ Status WriteDataToFile(const string& filename, const char* data,
     TF_RETURN_IF_ERROR(out.Append(data));
     TF_RETURN_IF_ERROR(out.Flush());
     TF_RETURN_IF_ERROR(out.Close());
+  } else if (params.compression_type == CompressionType::ZSTD) {
+    return tensorflow::errors::Unimplemented(
+        "Compression type not yet fully implemented: ", ToString(params.compression_type));
   } else {
     return tensorflow::errors::InvalidArgument(
         "Unsupported compression_type: ", ToString(params.compression_type));

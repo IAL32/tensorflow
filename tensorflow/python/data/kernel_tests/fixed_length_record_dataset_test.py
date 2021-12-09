@@ -60,6 +60,8 @@ class FixedLengthRecordDatasetTestBase(test_base.DatasetTestBase):
       contents.append(b"F" * self._footer_bytes)
       contents = b"".join(contents)
 
+      # FIXME: @IAL32
+      # Add ZSTD?
       if not compression_type:
         with open(fn, "wb") as f:
           f.write(contents)
@@ -145,6 +147,9 @@ class FixedLengthRecordDatasetTest(FixedLengthRecordDatasetTestBase,
   @combinations.generate(test_base.default_test_combinations())
   def testFixedLengthRecordDatasetZlibCompression(self):
     self._testFixedLengthRecordDataset(compression_type="ZLIB")
+
+  # FIXME: @IAL32
+  # Add ZSTD?
 
   @combinations.generate(test_base.default_test_combinations())
   def testFixedLengthRecordDatasetBuffering(self):

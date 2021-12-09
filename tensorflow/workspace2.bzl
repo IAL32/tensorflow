@@ -716,6 +716,18 @@ def _tf_repositories():
     )
 
     tf_http_archive(
+        name = "zstd",
+        build_file = "//third_party:zstd.BUILD",
+        sha256 = "5194fbfa781fcf45b98c5e849651aa7b3b0a008c6b72d4a0db760f3002291e94",
+        strip_prefix = "zstd-1.5.0",
+        system_build_file = "//third_party/systemlibs:zstd.BUILD",
+        urls = [
+            "https://storage.googleapis.com/mirror.tensorflow.org/github.com/facebook/zstd/releases/download/v1.5.0/zstd-1.5.0.tar.gz",
+            "https://github.com/facebook/zstd/releases/download/v1.5.0/zstd-1.5.0.tar.gz",
+        ],
+    )
+
+    tf_http_archive(
         name = "fft2d",
         build_file = "//third_party/fft2d:fft2d.BUILD",
         sha256 = "5f4dabc2ae21e1f537425d58a49cdca1c49ea11db0d6271e2a4b27e9697548eb",

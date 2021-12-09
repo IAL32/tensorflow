@@ -2426,6 +2426,8 @@ class MapStagingArea(BaseStagingArea):
         capacity=self._capacity,
         memory_limit=self._memory_limit)
 
+# FIXME: @IAL32
+# Add ZSTD?
 
 class RecordInput(object):
   """RecordInput asynchronously reads and randomly yields TFRecords.

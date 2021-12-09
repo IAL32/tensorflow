@@ -281,11 +281,19 @@ PYBIND11_MODULE(_pywrap_record_io, m) {
       .def_readwrite("compression_strategy",
                      &ZlibCompressionOptions::compression_strategy);
 
+  using tensorflow::io::ZstdCompressionOptions;
+  py::class_<ZstdCompressionOptions>(m, "ZstdCompressionOptions")
+      .def_readwrite("compression_level",
+                     &ZstdCompressionOptions::compression_level)
+      .def_readwrite("compression_strategy",
+                     &ZstdCompressionOptions::compression_strategy);
+
   using tensorflow::io::RecordWriterOptions;
   py::class_<RecordWriterOptions>(m, "RecordWriterOptions")
       .def(py::init(&RecordWriterOptions::CreateRecordWriterOptions))
       .def_readonly("compression_type", &RecordWriterOptions::compression_type)
-      .def_readonly("zlib_options", &RecordWriterOptions::zlib_options);
+      .def_readonly("zlib_options", &RecordWriterOptions::zlib_options)
+      .def_readonly("zstd_options", &RecordWriterOptions::zstd_options);
 
   using tensorflow::MaybeRaiseRegisteredFromStatus;
 

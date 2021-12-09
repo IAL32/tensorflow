@@ -70,6 +70,8 @@ class TFRecordWriterTest(test_base.DatasetTestBase, parameterized.TestCase):
     for i, r in enumerate(tf_record.tf_record_iterator(self._outputFilename())):
       self.assertAllEqual(self._record(i), r)
 
+  # FIXME: @IAL32
+  # Add ZSTD?
   @combinations.generate(test_base.default_test_combinations())
   def testWriteZLIB(self):
     options = tf_record.TFRecordOptions(tf_record.TFRecordCompressionType.ZLIB)

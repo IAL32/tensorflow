@@ -216,6 +216,7 @@ tensorflow/third_party/systemlibs/sqlite.BUILD
 tensorflow/third_party/systemlibs/syslibs_configure.bzl
 tensorflow/third_party/systemlibs/termcolor.BUILD
 tensorflow/third_party/systemlibs/zlib.BUILD
+tensorflow/third_party/systemlibs/zstd.BUILD
 tensorflow/third_party/tblib.BUILD
 tensorflow/third_party/tensorrt/BUILD
 tensorflow/third_party/tensorrt/BUILD.tpl
@@ -268,6 +269,7 @@ tensorflow/third_party/toolchains/preconfig/win_1803/py38/BUILD
 tensorflow/third_party/typing_extensions.BUILD
 tensorflow/third_party/wrapt.BUILD
 tensorflow/third_party/zlib.BUILD
+tensorflow/third_party/zstd.BUILD
 tensorflow/tools/build_info/BUILD
 tensorflow/tools/ci_build/a100/nightly.sh
 tensorflow/tools/ci_build/horovod/gpu/nightly.sh

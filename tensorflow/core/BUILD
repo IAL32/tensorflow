@@ -1369,6 +1369,7 @@ cc_library(
         "//tensorflow/core/lib/io:snappy_outputbuffer",
         "//tensorflow/core/lib/io:table",
         "//tensorflow/core/lib/io:table_options",
+        "//tensorflow/core/lib/io:zstd_compression_options",
         "//tensorflow/core/lib/io:zlib_compression_options",
         "//tensorflow/core/lib/io:zlib_inputstream",
         "//tensorflow/core/lib/io:zlib_outputbuffer",

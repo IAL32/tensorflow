@@ -46,6 +46,9 @@ RecordReaderOptions RecordReaderOptions::CreateRecordReaderOptions(
     options.zlib_options = io::ZlibCompressionOptions::GZIP();
   } else if (compression_type == compression::kSnappy) {
     options.compression_type = io::RecordReaderOptions::SNAPPY_COMPRESSION;
+  } else if (compression_type == compression::kZstd) {
+    options.compression_type = io::RecordReaderOptions::ZSTD_COMPRESSION;
+    options.zstd_options = io::ZstdCompressionOptions::DEFAULT();
   } else if (compression_type != compression::kNone) {
     LOG(ERROR) << "Unsupported compression_type:" << compression_type
                << ". No compression will be used.";

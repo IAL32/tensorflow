@@ -34,6 +34,7 @@ class TFRecordCompressionType(object):
   NONE = 0
   ZLIB = 1
   GZIP = 2
+  ZSTD = 3
 
 
 @tf_export(
@@ -45,8 +46,12 @@ class TFRecordOptions(object):
   compression_type_map = {
       TFRecordCompressionType.ZLIB: "ZLIB",
       TFRecordCompressionType.GZIP: "GZIP",
+      TFRecordCompressionType.ZSTD: "ZSTD",
       TFRecordCompressionType.NONE: ""
   }
+
+  # FIXME: @IAL32
+  # Add ZSTD?
 
   def __init__(self,
                compression_type=None,

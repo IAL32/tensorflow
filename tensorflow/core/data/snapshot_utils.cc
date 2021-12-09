@@ -35,6 +35,7 @@ limitations under the License.
 #include "tensorflow/core/lib/io/zlib_compression_options.h"
 #include "tensorflow/core/lib/io/zlib_inputstream.h"
 #include "tensorflow/core/lib/io/zlib_outputbuffer.h"
+#include "tensorflow/core/lib/io/zstd/zstd_compression_options.h"
 #include "tensorflow/core/platform/coding.h"
 #include "tensorflow/core/platform/errors.h"
 #include "tensorflow/core/platform/file_system.h"
@@ -199,6 +200,8 @@ Status CustomWriter::Initialize(tensorflow::Env* env) {
     TF_CHECK_OK(zlib_output_buffer->Init());
     dest_.reset(zlib_output_buffer);
   }
+  // FIXME: @IAL32
+  // Add ZSTD?
 #endif  // IS_SLIM_BUILD
   simple_tensor_mask_.reserve(dtypes_.size());
   for (const auto& dtype : dtypes_) {
@@ -775,6 +778,11 @@ Status CustomReader::Initialize(Env* env) {
       input_stream_ =
           absl::make_unique<io::BufferedInputStream>(file_.get(), 64 << 20);
     }
+  } else if (compression_type == io::compression::kZstd) {
+    io::ZstdCompressionOptions zstd_options;
+    zstd_options = io::ZstdCompressionOptions::DEFAULT();
+    return errors::Unimplemented("Compression ", compression_type_,
+                                 " is not yet implemented.");
   }
 #endif  // IS_SLIM_BUILD
   simple_tensor_mask_.reserve(dtypes_.size());

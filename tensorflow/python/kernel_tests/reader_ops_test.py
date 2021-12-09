@@ -103,6 +103,8 @@ class TFCompressionTestCase(test.TestCase):
         writer.write(r)
     return fn
 
+  # FIXME: @IAL32
+  # Add ZSTD?
   def _ZlibCompressFile(self, infile, name="tfrecord.z"):
     # zlib compress the file and write compressed contents to file.
     with open(infile, "rb") as f:
@@ -476,6 +478,10 @@ class FixedLengthRecordReaderTest(TFCompressionTestCase):
       # compress inplace.
       self._GzipCompressFile(fn, fn)
     return filenames
+
+
+  # FIXME: @IAL32
+  # Add ZSTD?
 
   # gap_bytes=hop_bytes-record_bytes
   def _CreateZlibFiles(self, num_records, gap_bytes):
