@@ -18,28 +18,11 @@ package(
 
 exports_files([
     "zstd_compression_options.h",
-    "zstd_inputbuffer.h",
     "zstd_inputstream.h",
     "zstd_outputbuffer.h",
     "zstd_inputstream.cc",
     "zstd_test.cc",
 ])
-
-cc_library(
-    name = "zstd_inputbuffer",
-    srcs = ["zstd_inputbuffer.cc"],
-    hdrs = ["zstd_inputbuffer.h"],
-    deps = [
-        "//tensorflow/core/lib/core:status",
-        "//tensorflow/core/lib/io:inputstream_interface",
-        "//tensorflow/core/platform:env",
-        "//tensorflow/core/platform:macros",
-        "//tensorflow/core/platform:platform_port",
-        "//tensorflow/core/platform:types",
-        "@zstd",
-    ],
-    alwayslink = True,
-)
 
 cc_library(
     name = "zstd_outputbuffer",
@@ -88,7 +71,6 @@ tf_cc_test(
     srcs = ["zstd_test.cc"],
     deps = [
         ":zstd_compression_options",
-        ":zstd_inputbuffer",
         ":zstd_inputstream",
         ":zstd_outputbuffer",
         "//tensorflow/core:lib",

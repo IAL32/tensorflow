@@ -208,11 +208,6 @@ alias(
 )
 
 alias(
-    name = "zstd_inputbuffer",
-    actual = "//tensorflow/core/lib/io/zstd:zstd_inputbuffer",
-)
-
-alias(
     name = "zstd_inputstream",
     actual = "//tensorflow/core/lib/io/zstd:zstd_inputstream",
 )

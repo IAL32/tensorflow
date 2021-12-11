@@ -83,10 +83,11 @@ void TestWrite(uint8 input_buffer_size, uint8 output_buffer_size,
   TF_ASSERT_OK(file_writer->Flush());
   TF_ASSERT_OK(file_writer->Close());
 
-  // std::unique_ptr<RandomAccessFile> file_reader;
-  // TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
-  // std::unique_ptr<RandomAccessInputStream> input_stream(
-  //     new RandomAccessInputStream(file_reader.get()));
+  std::unique_ptr<RandomAccessFile> file_reader;
+  TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
+  std::unique_ptr<RandomAccessInputStream> input_stream(
+      new RandomAccessInputStream(file_reader.get()));
+  
   // ZlibInputStream in(input_stream.get(), input_buf_size, output_buf_size,
   //                     input_options);
   // TF_ASSERT_OK(in.ReadNBytes(data.size(), &result));
