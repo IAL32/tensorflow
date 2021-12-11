@@ -23,7 +23,7 @@ namespace io {
 ZstdCompressionOptions::ZstdCompressionOptions() {
   compression_level = ZSTD_CLEVEL_DEFAULT;
   compression_strategy = 0; // default
-  threads = 0; // single-threaded by default
+  nb_workers = 0; // single-threaded by default
 }
 
 }  // namespace io

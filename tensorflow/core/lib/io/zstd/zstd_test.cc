@@ -60,49 +60,8 @@ static string GenTestString(int copies = 1) {
 
 typedef io::ZstdCompressionOptions CompressionOptions;
 
-void TestAllCombinations(CompressionOptions input_options,
-                         CompressionOptions output_options) {
-  Env* env = Env::Default();
-  string fname;
-  ASSERT_TRUE(env->LocalTempFilename(&fname));
-  for (auto file_size : NumCopies()) {
-    // Write to compressed file
-    string data = GenTestString(file_size);
-    for (auto input_buf_size : InputBufferSizes()) {
-      for (auto output_buf_size : OutputBufferSizes()) {
-        std::unique_ptr<WritableFile> file_writer;
-        TF_ASSERT_OK(env->NewWritableFile(fname, &file_writer));
-        tstring result;
-
-        ZstdOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
-                             output_options);
-
-        TF_ASSERT_OK(out.Append(StringPiece(data)));
-        TF_ASSERT_OK(out.Close());
-        TF_ASSERT_OK(file_writer->Flush());
-        TF_ASSERT_OK(file_writer->Close());
-
-        std::unique_ptr<RandomAccessFile> file_reader;
-        TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
-        std::unique_ptr<RandomAccessInputStream> input_stream(
-            new RandomAccessInputStream(file_reader.get()));
-        // ZstdInputStream in(input_stream.get(), input_buf_size,
-        // output_buf_size,
-        //                    input_options);
-        // TF_ASSERT_OK(in.ReadNBytes(data.size(), &result));
-        // EXPECT_EQ(result, data);
-      }
-    }
-  }
-}
-
-TEST(ZstdBuffers, DefaultOptions) {
-  TestAllCombinations(CompressionOptions::DEFAULT(),
-                      CompressionOptions::DEFAULT());
-}
-
-void TestMultipleWrites(uint8 input_buf_size, uint8 output_buf_size,
-                        int num_writes, bool with_flush = false) {
+void TestWrite(uint8 input_buffer_size, uint8 output_buffer_size,
+               bool with_flush = false) {
   Env* env = Env::Default();
   CompressionOptions input_options = CompressionOptions::DEFAULT();
   CompressionOptions output_options = CompressionOptions::DEFAULT();
@@ -115,192 +74,27 @@ void TestMultipleWrites(uint8 input_buf_size, uint8 output_buf_size,
   string expected_result;
 
   TF_ASSERT_OK(env->NewWritableFile(fname, &file_writer));
-  ZstdOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
+  ZstdOutputBuffer out(file_writer.get(), input_buffer_size, output_buffer_size,
                        output_options);
-  // TF_ASSERT_OK(out.Init());
-
-  for (int i = 0; i < num_writes; i++) {
-    TF_ASSERT_OK(out.Append(StringPiece(data)));
-    if (with_flush) {
-      TF_ASSERT_OK(out.Flush());
-    }
-    strings::StrAppend(&expected_result, data);
-  }
-  TF_ASSERT_OK(out.Close());
-  TF_ASSERT_OK(file_writer->Flush());
-  TF_ASSERT_OK(file_writer->Close());
-
-  std::unique_ptr<RandomAccessFile> file_reader;
-  TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
-  std::unique_ptr<RandomAccessInputStream> input_stream(
-      new RandomAccessInputStream(file_reader.get()));
-  ZstdInputStream in(input_stream.get(), input_buf_size, output_buf_size,
-                     input_options);
-
-  for (int i = 0; i < num_writes; i++) {
-    tstring decompressed_output;
-    TF_ASSERT_OK(in.ReadNBytes(data.size(), &decompressed_output));
-    strings::StrAppend(&actual_result, decompressed_output);
-  }
-
-  EXPECT_EQ(actual_result, expected_result);
-}
-
-TEST(ZstdBuffers, MultipleWritesWithoutFlush) {
-  TestMultipleWrites(200, 200, 10);
-}
-
-TEST(ZstdBuffers, MultipleWriteCallsWithFlush) {
-  TestMultipleWrites(200, 200, 10, true);
-}
-
-void WriteCompressedFile(Env* env, const string& fname, int input_buf_size,
-                         int output_buf_size,
-                         const CompressionOptions& output_options,
-                         const string& data) {
-  std::unique_ptr<WritableFile> file_writer;
-  TF_ASSERT_OK(env->NewWritableFile(fname, &file_writer));
-
-  ZstdOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
-                       output_options);
-  // TF_ASSERT_OK(out.Init());
 
   TF_ASSERT_OK(out.Append(StringPiece(data)));
+
   TF_ASSERT_OK(out.Close());
   TF_ASSERT_OK(file_writer->Flush());
   TF_ASSERT_OK(file_writer->Close());
+
+  // std::unique_ptr<RandomAccessFile> file_reader;
+  // TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
+  // std::unique_ptr<RandomAccessInputStream> input_stream(
+  //     new RandomAccessInputStream(file_reader.get()));
+  // ZlibInputStream in(input_stream.get(), input_buf_size, output_buf_size,
+  //                     input_options);
+  // TF_ASSERT_OK(in.ReadNBytes(data.size(), &result));
+  // EXPECT_EQ(result, data);
 }
 
-void TestTell(CompressionOptions input_options,
-              CompressionOptions output_options) {
-  Env* env = Env::Default();
-  string fname;
-  ASSERT_TRUE(env->LocalTempFilename(&fname));
-  for (auto file_size : NumCopies()) {
-    string data = GenTestString(file_size);
-    for (auto input_buf_size : InputBufferSizes()) {
-      for (auto output_buf_size : OutputBufferSizes()) {
-        // Write the compressed file.
-        WriteCompressedFile(env, fname, input_buf_size, output_buf_size,
-                            output_options, data);
-
-        // Boiler-plate to set up ZstdInputStream.
-        std::unique_ptr<RandomAccessFile> file_reader;
-        TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
-        std::unique_ptr<RandomAccessInputStream> input_stream(
-            new RandomAccessInputStream(file_reader.get()));
-        ZstdInputStream in(input_stream.get(), input_buf_size, output_buf_size,
-                           input_options);
-
-        tstring first_half(string(data, 0, data.size() / 2));
-        tstring bytes_read;
-
-        // Read the first half of the uncompressed file and expect that Tell()
-        // returns half the uncompressed length of the file.
-        TF_ASSERT_OK(in.ReadNBytes(first_half.size(), &bytes_read));
-        EXPECT_EQ(in.Tell(), first_half.size());
-        EXPECT_EQ(bytes_read, first_half);
-
-        // Read the remaining half of the uncompressed file and expect that
-        // Tell() points past the end of file.
-        tstring second_half;
-        TF_ASSERT_OK(
-            in.ReadNBytes(data.size() - first_half.size(), &second_half));
-        EXPECT_EQ(in.Tell(), data.size());
-        bytes_read.append(second_half);
-
-        // Expect that the file is correctly read.
-        EXPECT_EQ(bytes_read, data);
-      }
-    }
-  }
-}
-
-void TestSkipNBytes(CompressionOptions input_options,
-                    CompressionOptions output_options) {
-  Env* env = Env::Default();
-  string fname;
-  ASSERT_TRUE(env->LocalTempFilename(&fname));
-  for (auto file_size : NumCopies()) {
-    string data = GenTestString(file_size);
-    for (auto input_buf_size : InputBufferSizes()) {
-      for (auto output_buf_size : OutputBufferSizes()) {
-        // Write the compressed file.
-        WriteCompressedFile(env, fname, input_buf_size, output_buf_size,
-                            output_options, data);
-
-        // Boiler-plate to set up ZstdInputStream.
-        std::unique_ptr<RandomAccessFile> file_reader;
-        TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
-        std::unique_ptr<RandomAccessInputStream> input_stream(
-            new RandomAccessInputStream(file_reader.get()));
-        ZstdInputStream in(input_stream.get(), input_buf_size, output_buf_size,
-                           input_options);
-
-        size_t data_half_size = data.size() / 2;
-        string second_half(data, data_half_size, data.size() - data_half_size);
-
-        // Skip past the first half of the file and expect Tell() returns
-        // correctly.
-        TF_ASSERT_OK(in.SkipNBytes(data_half_size));
-        EXPECT_EQ(in.Tell(), data_half_size);
-
-        // Expect that second half is read correctly and Tell() returns past
-        // end of file after reading complete file.
-        tstring bytes_read;
-        TF_ASSERT_OK(in.ReadNBytes(second_half.size(), &bytes_read));
-        EXPECT_EQ(bytes_read, second_half);
-        EXPECT_EQ(in.Tell(), data.size());
-      }
-    }
-  }
-}
-
-void TestSoftErrorOnDecompress(CompressionOptions input_options) {
-  Env* env = Env::Default();
-  string fname;
-  ASSERT_TRUE(env->LocalTempFilename(&fname));
-
-  std::unique_ptr<WritableFile> file_writer;
-  TF_ASSERT_OK(env->NewWritableFile(fname, &file_writer));
-  TF_ASSERT_OK(file_writer->Append("nonsense non-gzip data"));
-  TF_ASSERT_OK(file_writer->Flush());
-  TF_ASSERT_OK(file_writer->Close());
-
-  // Test `ReadNBytes` returns an error.
-  {
-    std::unique_ptr<RandomAccessFile> file_reader;
-    TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
-    std::unique_ptr<RandomAccessInputStream> input_stream(
-        new RandomAccessInputStream(file_reader.get()));
-    ZstdInputStream in(input_stream.get(), 100, 100, input_options);
-
-    tstring unused;
-    EXPECT_TRUE(errors::IsDataLoss(in.ReadNBytes(5, &unused)));
-  }
-
-  // Test `SkipNBytes` returns an error.
-  {
-    std::unique_ptr<RandomAccessFile> file_reader;
-    TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
-    std::unique_ptr<RandomAccessInputStream> input_stream(
-        new RandomAccessInputStream(file_reader.get()));
-    ZstdInputStream in(input_stream.get(), 100, 100, input_options);
-
-    EXPECT_TRUE(errors::IsDataLoss(in.SkipNBytes(5)));
-  }
-}
-
-TEST(ZstdInputStream, TellDefaultOptions) {
-  TestTell(CompressionOptions::DEFAULT(), CompressionOptions::DEFAULT());
-}
-
-TEST(ZstdInputStream, SkipNBytesDefaultOptions) {
-  TestSkipNBytes(CompressionOptions::DEFAULT(), CompressionOptions::DEFAULT());
-}
-
-TEST(ZstdInputStream, TestSoftErrorOnDecompressDefaultOptions) {
-  TestSoftErrorOnDecompress(CompressionOptions::DEFAULT());
+TEST(ZstdBuffers, SingleWrite) {
+  TestWrite(100, 100, false);
 }
 
 }  // namespace io

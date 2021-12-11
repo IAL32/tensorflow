@@ -16,7 +16,6 @@ limitations under the License.
 #ifndef TENSORFLOW_CORE_LIB_IO_ZSTD_ZSTD_OUTPUTBUFFER_H_
 #define TENSORFLOW_CORE_LIB_IO_ZSTD_ZSTD_OUTPUTBUFFER_H_
 
-// #include <zstd/lib/zstd.h>
 #include <zstd.h>
 
 #include <string>
@@ -94,16 +93,6 @@ class ZstdOutputBuffer : public WritableFile {
   // reflect buffered, un-flushed data.
   Status Tell(int64* position) override;
 
-  // Adds `data` to the compression pipeline.
-  //
-  // The input data is buffered in `input_buffer_` and is compressed in bulk
-  // when the buffer gets full. The compressed output may not be immediately
-  // written to file but rather buffered in `output_buffer_` and gets written
-  // to file when the buffer is full.
-  //
-  // To immediately write contents to file call `Flush()`.
-  Status Write(StringPiece data);
-
   // Compresses any cached input and writes all output to file. This must be
   // called before the destructor to avoid any data loss.
   Status Flush();
@@ -120,15 +109,28 @@ class ZstdOutputBuffer : public WritableFile {
   // Returns the total space available in `input_buffer_`.
   int32 AvailableInputSpace() const;
 
-  Status DeflateBuffered();
+  Status DeflateBuffered(bool last_chunk);
 
   Status FlushOutputBufferToFile();
 
-  Status Deflate();
+  Status Deflate(bool last_chunk);
 
   WritableFile* file_;  // Not owned
+  size_t input_buffer_capacity_;
+  size_t output_buffer_capacity_;
+  ZSTD_CCtx* context_;
 
-  ZstdCompressionOptions const zstd_options_;
+  std::unique_ptr<char[]> input_buffer_;
+  char* next_in_;
+  size_t avail_in_ = 0;
+
+  std::unique_ptr<char[]> output_buffer_;
+  char* next_out_;
+  size_t avail_out_;
+
+  const ZstdCompressionOptions zstd_options_;
+
+  size_t remaining_ = 0;
 
   TF_DISALLOW_COPY_AND_ASSIGN(ZstdOutputBuffer);
 };

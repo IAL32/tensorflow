@@ -52,7 +52,7 @@ class ZstdCompressionOptions {
   // More workers improve speed, but also increase memory usage.
   // Default value is `0`, aka "single-threaded mode" : no worker is spawned,
   // compression is performed inside Caller's thread, and all invocations are blocking
-  int8 threads;
+  int8 nb_workers;
 
   // From the zstd manual: https://facebook.github.io/zstd/zstd_manual.html#Chapter5
   // Corresponds to ZSTD_c_strategy
