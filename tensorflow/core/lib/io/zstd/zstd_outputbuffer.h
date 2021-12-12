@@ -127,8 +127,6 @@ class ZstdOutputBuffer : public WritableFile {
 
   const ZstdCompressionOptions zstd_options_;
 
-  size_t remaining_ = 0;
-
   TF_DISALLOW_COPY_AND_ASSIGN(ZstdOutputBuffer);
 };
 
