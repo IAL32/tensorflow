@@ -98,13 +98,10 @@ class ZstdOutputBuffer : public WritableFile {
   Status Flush();
 
  private:
+  void InitZstdBuffer();
   // Appends `data` to `input_buffer_`.
   // Throws if `data.size()` > AvailableInputSpace().
   void AddToInputBuffer(StringPiece data);
-
-  // Appends `data` to `output_buffer_`. Flushes buffer contents to file when
-  // buffer gets full.
-  Status AddToOutputBuffer(const char* data, size_t length);
 
   // Returns the total space available in `input_buffer_`.
   int32 AvailableInputSpace() const;

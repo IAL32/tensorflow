@@ -15,8 +15,9 @@ limitations under the License.
 
 #include "tensorflow/core/lib/io/zstd/zstd_inputstream.h"
 
-#include "absl/memory/memory.h"
 #include "tensorflow/core/platform/errors.h"
+#include "tensorflow/core/platform/logging.h"
+#include "tensorflow/core/platform/strcat.h"
 
 namespace tensorflow {
 namespace io {
@@ -28,8 +29,14 @@ ZstdInputStream::ZstdInputStream(InputStreamInterface* input_stream,
                                  bool owns_input_stream)
     : owns_input_stream_(owns_input_stream),
       input_stream_(input_stream),
+      input_buffer_(new char[input_buffer_bytes]),
+      input_buffer_capacity_(input_buffer_bytes),
+      output_buffer_(new char[output_buffer_bytes]),
+      output_buffer_capacity_(output_buffer_bytes),
       bytes_read_(0),
-      zstd_options_(zstd_options) {}
+      zstd_options_(zstd_options) {
+  InitZstdBuffer();
+}
 
 ZstdInputStream::ZstdInputStream(InputStreamInterface* input_stream,
                                  size_t input_buffer_bytes,
@@ -38,10 +45,72 @@ ZstdInputStream::ZstdInputStream(InputStreamInterface* input_stream,
     : ZstdInputStream(input_stream, input_buffer_bytes, output_buffer_bytes,
                       zstd_options, false) {}
 
-ZstdInputStream::~ZstdInputStream() {}
+ZstdInputStream::~ZstdInputStream() {
+  ZSTD_freeDCtx(context_);
+  if (owns_input_stream_) {
+    delete input_stream_;
+  }
+}
+
+void ZstdInputStream::InitZstdBuffer() {
+  context_ = ZSTD_createDCtx();
+  if (context_ == nullptr) {
+    LOG(FATAL) << "Creation of context failed.";
+  }
+  next_in_byte_ = input_buffer_.get();
+  zstd_input_buffer_ = {next_in_byte_, 0, 0};
+  next_unread_byte_ = output_buffer_.get();
+  unread_bytes_ = 0;
+  avail_in_ = 0;
+}
+
+Status ZstdInputStream::Reset() {
+  TF_RETURN_IF_ERROR(input_stream_->Reset());
+  ZSTD_DCtx_reset(context_, ZSTD_reset_session_only);
+  InitZstdBuffer();
+  bytes_read_ = 0;
+  return Status::OK();
+}
+
+size_t ZstdInputStream::ReadBytesFromCache(size_t bytes_to_read,
+                                           tstring* result) {
+  size_t can_read_bytes = std::min(bytes_to_read, unread_bytes_);
+  std::cout << "ReadBytesFromCache(): can_read_bytes: " << can_read_bytes
+            << std::endl;
+  if (can_read_bytes > 0) {
+    result->append(next_unread_byte_, can_read_bytes);
+    next_unread_byte_ += can_read_bytes;
+  }
+  bytes_read_ += can_read_bytes;
+  return can_read_bytes;
+}
 
 Status ZstdInputStream::ReadNBytes(int64 bytes_to_read, tstring* result) {
-  return errors::Unimplemented("Not implemented");
+  result->clear();
+
+  bytes_to_read -= ReadBytesFromCache(bytes_to_read, result);
+
+  std::cout << "ReadNBytes(): bytes_to_read: " << bytes_to_read << std::endl;
+
+  while (bytes_to_read > 0) {
+    // No bytes should be left in the cache.
+    DCHECK_EQ(unread_bytes_, 0);
+
+    // Now that the cache is empty we need to inflate more data.
+    next_unread_byte_ = output_buffer_.get();
+    zstd_input_buffer_.pos = 0;
+
+    TF_RETURN_IF_ERROR(Inflate());
+
+    // If no progress was made by inflate, read more compressed data from the
+    // input stream.
+    std::cout << "ReadNBytes(): unread_bytes_: " << unread_bytes_ << std::endl;
+    if (unread_bytes_ == 0) {
+      TF_RETURN_IF_ERROR(ReadFromStream());
+    } else {
+      bytes_to_read -= ReadBytesFromCache(bytes_to_read, result);
+    }
+  }
 }
 
 #if defined(TF_CORD_SUPPORT)
@@ -56,18 +125,86 @@ Status ZstdInputStream::ReadNBytes(int64 bytes_to_read, absl::Cord* result) {
 #endif
 
 Status ZstdInputStream::Inflate() {
-  return errors::Unimplemented("Not implemented");
+  std::cout << "Inflate(): input.pos: " << zstd_input_buffer_.pos
+            << ", input.size: " << zstd_input_buffer_.size << std::endl;
+
+  ZSTD_outBuffer output = {output_buffer_.get(), output_buffer_capacity_, 0};
+  last_return_ = ZSTD_decompressStream(context_, &output, &zstd_input_buffer_);
+
+  if (ZSTD_isError(last_return_)) {
+    string error_name = ZSTD_getErrorName(last_return_);
+    string error_string =
+        strings::StrCat("ZSTD_decompressStream: ", error_name);
+    return errors::DataLoss(error_string);
+  }
+
+  tstring result;
+  result.append(output_buffer_.get(), output_buffer_capacity_);
+
+  std::cout << "Inflate(): last_return_: " << last_return_
+            << ", input.pos: " << zstd_input_buffer_.pos
+            << ", output.pos: " << output.pos
+            << ", output.size: " << output.size << ", result: '" << result
+            << "'" << std::endl;
+
+  avail_in_ = 0;
+  unread_bytes_ = output.pos;
+
+  return Status::OK();
 }
 
-size_t ZstdInputStream::ReadBytesFromCache(size_t bytes_to_read, char* result) {
-  return 0;
+Status ZstdInputStream::ReadFromStream() {
+  size_t bytes_to_read = input_buffer_capacity_;
+  char* read_location = input_buffer_.get();
+
+  std::cout << "ReadFromStream(): bytes_to_read: " << bytes_to_read
+            << ", avail_in_: " << avail_in_ << std::endl;
+  // If there are unread bytes in the input stream we move them to the head
+  // of the stream to maximize the space available to read new data into.
+  if (avail_in_ > 0) {
+    size_t read_bytes = next_in_byte_ - input_buffer_.get();
+    // Remove `read_bytes` from the head of the input stream.
+    // Move unread bytes to the head of the input stream.
+    if (read_bytes > 0) {
+      memmove(input_buffer_.get(), next_in_byte_, avail_in_);
+    }
+
+    bytes_to_read -= avail_in_;
+    read_location += avail_in_;
+  }
+
+  tstring data;
+  Status s = input_stream_->ReadNBytes(bytes_to_read, &data);
+  memcpy(read_location, data.data(), data.size());
+
+  std::cout << "ReadFromStream(): data: '" << data << "'" << std::endl;
+
+  next_in_byte_ = input_buffer_.get();
+
+  // Note: data.size() could be different from bytes_to_read.
+  avail_in_ += data.size();
+  zstd_input_buffer_.size = avail_in_;
+
+  if (!s.ok() && !errors::IsOutOfRange(s)) {
+    return s;
+  }
+
+  // We throw OutOfRange error iff no new data has been read from stream.
+  // Since we never check how much data is remaining in the stream, it is
+  // possible that on the last read there isn't enough data in the stream to
+  // fill up the buffer in which case input_stream_->ReadNBytes would return an
+  // OutOfRange error.
+  if (data.empty()) {
+    return errors::OutOfRange("EOF reached");
+  }
+  if (errors::IsOutOfRange(s)) {
+    return Status::OK();
+  }
+
+  return s;
 }
 
 int64 ZstdInputStream::Tell() const { return bytes_read_; }
-
-Status ZstdInputStream::Reset() {
-  return errors::Unimplemented("Not implemented");
-}
 
 }  // namespace io
 }  // namespace tensorflow

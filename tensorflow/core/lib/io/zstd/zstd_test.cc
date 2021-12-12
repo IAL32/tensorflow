@@ -60,7 +60,7 @@ static string GenTestString(int copies = 1) {
 
 typedef io::ZstdCompressionOptions CompressionOptions;
 
-void TestWrite(uint8 input_buffer_size, uint8 output_buffer_size,
+void TestWrite(uint8 input_buf_size, uint8 output_buf_size,
                bool with_flush = false) {
   Env* env = Env::Default();
   CompressionOptions input_options = CompressionOptions::DEFAULT();
@@ -70,11 +70,10 @@ void TestWrite(uint8 input_buffer_size, uint8 output_buffer_size,
   ASSERT_TRUE(env->LocalTempFilename(&fname));
   string data = GenTestString();
   std::unique_ptr<WritableFile> file_writer;
-  string actual_result;
-  string expected_result;
+  tstring result;
 
   TF_ASSERT_OK(env->NewWritableFile(fname, &file_writer));
-  ZstdOutputBuffer out(file_writer.get(), input_buffer_size, output_buffer_size,
+  ZstdOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
                        output_options);
 
   TF_ASSERT_OK(out.Append(StringPiece(data)));
@@ -88,10 +87,10 @@ void TestWrite(uint8 input_buffer_size, uint8 output_buffer_size,
   std::unique_ptr<RandomAccessInputStream> input_stream(
       new RandomAccessInputStream(file_reader.get()));
   
-  // ZlibInputStream in(input_stream.get(), input_buf_size, output_buf_size,
-  //                     input_options);
-  // TF_ASSERT_OK(in.ReadNBytes(data.size(), &result));
-  // EXPECT_EQ(result, data);
+  ZstdInputStream in(input_stream.get(), input_buf_size, output_buf_size,
+                      input_options);
+  TF_ASSERT_OK(in.ReadNBytes(data.size(), &result));
+  EXPECT_EQ(result, data);
 }
 
 TEST(ZstdBuffers, SingleWrite) {

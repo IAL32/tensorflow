@@ -16,8 +16,13 @@ limitations under the License.
 #ifndef TENSORFLOW_CORE_LIB_IO_ZSTD_ZSTD_INPUTSTREAM_H_
 #define TENSORFLOW_CORE_LIB_IO_ZSTD_ZSTD_INPUTSTREAM_H_
 
+#include <zstd.h>
+
 #include "tensorflow/core/lib/io/inputstream_interface.h"
 #include "tensorflow/core/lib/io/zstd/zstd_compression_options.h"
+#include "tensorflow/core/platform/env.h"
+#include "tensorflow/core/platform/macros.h"
+#include "tensorflow/core/platform/types.h"
 
 namespace tensorflow {
 namespace io {
@@ -62,17 +67,36 @@ class ZstdInputStream : public InputStreamInterface {
   // Decompress the next chunk of data and place the data into the cache.
   Status Inflate();
 
-  // Attempt to read `bytes_to_read` from the decompressed data cache. Returns
-  // the actual number of bytes read.
-  size_t ReadBytesFromCache(size_t bytes_to_read, char* result);
+  Status ReadFromStream();
+
+  // There may be bytes leftover from last read. We read them so that we don't
+  // lose them, and we optimize resources.
+  size_t ReadBytesFromCache(size_t bytes_to_read, tstring* result);
+
+  void InitZstdBuffer();
 
   const bool owns_input_stream_;
   InputStreamInterface* input_stream_;
+  std::unique_ptr<char[]> input_buffer_;
+  size_t input_buffer_capacity_;  // Size of input_buffer_
+  char* next_in_byte_;            // Next unread byte to decompress
+  size_t avail_in_;  // Number of bytes available to be decompressed
+  ZSTD_inBuffer zstd_input_buffer_;
+
+  std::unique_ptr<char[]> output_buffer_;  // Inflated buffer
+  size_t output_buffer_capacity_;          // Size of output_buffer_
+  char* next_unread_byte_;                  // Next unread byte in output_buffer_
+  // bytes left in the output_buffer_ not yet read.
+  size_t unread_bytes_;
+
+  ZSTD_DCtx* context_;
 
   // Specifies the number of decompressed bytes currently read.
-  int64 bytes_read_;
+  size_t bytes_read_;
 
-  ZstdCompressionOptions const zstd_options_;
+  size_t last_return_;
+
+  const ZstdCompressionOptions zstd_options_;
 
   TF_DISALLOW_COPY_AND_ASSIGN(ZstdInputStream);
 };
