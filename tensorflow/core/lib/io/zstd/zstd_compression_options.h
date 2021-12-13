@@ -27,56 +27,62 @@ class ZstdCompressionOptions {
 
   static ZstdCompressionOptions DEFAULT();
 
-  // From the zstd manual: https://facebook.github.io/zstd/zstd_manual.html#Chapter5
-  // Corresponds to ZSTD_c_compressionLevel
-  // Set compression parameters according to pre-defined cLevel table.
-  // Note that exact compression parameters are dynamically determined,
-  // depending on both compression level and srcSize (when known).
+  int64 input_buffer_size;
+
+  int64 output_buffer_size;
+
+  // From the zstd manual:
+  // https://facebook.github.io/zstd/zstd_manual.html#Chapter5 Corresponds to
+  // ZSTD_c_compressionLevel Set compression parameters according to pre-defined
+  // cLevel table. Note that exact compression parameters are dynamically
+  // determined, depending on both compression level and srcSize (when known).
   // Default level is ZSTD_CLEVEL_DEFAULT==3.
   // Special: value 0 means default, which is controlled by ZSTD_CLEVEL_DEFAULT.
   // Note 1: it's possible to pass a negative compression level.
-  // Note 2: setting a level does not automatically set all other compression parameters
-  // to default. Setting this will however eventually dynamically impact the compression
-  // parameters which have not been manually set. The manually set
-  // ones will 'stick'
+  // Note 2: setting a level does not automatically set all other compression
+  // parameters to default. Setting this will however eventually dynamically
+  // impact the compression parameters which have not been manually set. The
+  // manually set ones will 'stick'
   int8 compression_level;
 
-  // From the zstd manual: https://facebook.github.io/zstd/zstd_manual.html#Chapter5
-  // Maximum allowed back-reference distance, expressed as power of 2.
-  // This will set a memory budget for streaming decompression,
-  // with larger values requiring more memory
-  // and typically compressing more.
-  // Must be clamped between ZSTD_WINDOWLOG_MIN and ZSTD_WINDOWLOG_MAX.
-  // Special: value 0 means "use default windowLog".
-  // Note: Using a windowLog greater than ZSTD_WINDOWLOG_LIMIT_DEFAULT
-  //       requires explicitly allowing such size at streaming decompression stage.
+  // From the zstd manual:
+  // https://facebook.github.io/zstd/zstd_manual.html#Chapter5 Maximum allowed
+  // back-reference distance, expressed as power of 2. This will set a memory
+  // budget for streaming decompression, with larger values requiring more
+  // memory and typically compressing more. Must be clamped between
+  // ZSTD_WINDOWLOG_MIN and ZSTD_WINDOWLOG_MAX. Special: value 0 means "use
+  // default windowLog". Note: Using a windowLog greater than
+  // ZSTD_WINDOWLOG_LIMIT_DEFAULT
+  //       requires explicitly allowing such size at streaming decompression
+  //       stage.
   int8 window_log;
 
-  // From the zstd manual: https://facebook.github.io/zstd/zstd_manual.html#Chapter5
-  // Corresponds to ZSTD_c_nbWorkers
-  // Select how many threads will be spawned to compress in parallel.
-  // When nbWorkers >= 1, triggers asynchronous mode when invoking ZSTD_compressStream*() :
-  // ZSTD_compressStream*() consumes input and flush output if possible, but immediately gives back control to caller,
-  // while compression is performed in parallel, within worker thread(s).
-  // (note : a strong exception to this rule is when first invocation of ZSTD_compressStream2() sets ZSTD_e_end :
-  //  in which case, ZSTD_compressStream2() delegates to ZSTD_compress2(), which is always a blocking call).
+  // From the zstd manual:
+  // https://facebook.github.io/zstd/zstd_manual.html#Chapter5 Corresponds to
+  // ZSTD_c_nbWorkers Select how many threads will be spawned to compress in
+  // parallel. When nbWorkers >= 1, triggers asynchronous mode when invoking
+  // ZSTD_compressStream*() : ZSTD_compressStream*() consumes input and flush
+  // output if possible, but immediately gives back control to caller, while
+  // compression is performed in parallel, within worker thread(s). (note : a
+  // strong exception to this rule is when first invocation of
+  // ZSTD_compressStream2() sets ZSTD_e_end :
+  //  in which case, ZSTD_compressStream2() delegates to ZSTD_compress2(), which
+  //  is always a blocking call).
   // More workers improve speed, but also increase memory usage.
   // Default value is `0`, aka "single-threaded mode" : no worker is spawned,
-  // compression is performed inside Caller's thread, and all invocations are blocking
+  // compression is performed inside Caller's thread, and all invocations are
+  // blocking
   int8 nb_workers;
 
-  // From the zstd manual: https://facebook.github.io/zstd/zstd_manual.html#Chapter5
-  // Corresponds to ZSTD_c_strategy
-  // ZSTD_fast=1,
-  // ZSTD_dfast=2,
-  // ZSTD_greedy=3,
-  // ZSTD_lazy=4,
+  // From the zstd manual:
+  // https://facebook.github.io/zstd/zstd_manual.html#Chapter5 Corresponds to
+  // ZSTD_c_strategy ZSTD_fast=1, ZSTD_dfast=2, ZSTD_greedy=3, ZSTD_lazy=4,
   // ZSTD_lazy2=5,
   // ZSTD_btlazy2=6,
   // ZSTD_btopt=7,
   // ZSTD_btultra=8,
   // ZSTD_btultra2=9
-  // 
+  //
   // note: new strategies _might_ be added in the future.
   // Only the order (from fast to strong) is guaranteed.
   // Special: value 0 means "use default strategy".

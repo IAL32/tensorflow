@@ -21,10 +21,13 @@ namespace tensorflow {
 namespace io {
 
 ZstdCompressionOptions::ZstdCompressionOptions() {
-  window_log = 0; // default
-  compression_level = ZSTD_CLEVEL_DEFAULT;
-  compression_strategy = 0; // default
-  nb_workers = 0; // single-threaded by default
+  input_buffer_size = 256 << 10;
+  output_buffer_size = 256 << 10;
+
+  window_log = 0;                           // default
+  compression_level = ZSTD_CLEVEL_DEFAULT;  // default
+  compression_strategy = 0;                 // default
+  nb_workers = 0;                           // single-threaded by default
 }
 
 }  // namespace io
