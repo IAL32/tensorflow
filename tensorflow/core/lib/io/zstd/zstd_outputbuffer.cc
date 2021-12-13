@@ -59,6 +59,8 @@ void ZstdOutputBuffer::InitZstdBuffer() {
   }
   ZSTD_CCtx_setParameter(context_, ZSTD_c_compressionLevel,
                          zstd_options_.compression_level);
+  ZSTD_CCtx_setParameter(context_, ZSTD_c_strategy,
+                         zstd_options_.compression_strategy);
   ZSTD_CCtx_setParameter(context_, ZSTD_c_checksumFlag, 1);
   ZSTD_CCtx_setParameter(context_, ZSTD_c_nbWorkers, zstd_options_.nb_workers);
 
@@ -86,13 +88,13 @@ Status ZstdOutputBuffer::Append(StringPiece data) {
   // If there isn't enough available space in the input_buffer_ we empty it
   // by uncompressing its contents. If data now fits in input_buffer_
   // we add it there else we directly deflate it.
-  // TF_RETURN_IF_ERROR(DeflateBuffered(false));
+  TF_RETURN_IF_ERROR(Deflate(ZSTD_e_flush));
 
   // At this point input stream should be empty.
-  // if (bytes_to_write <= AvailableInputSpace()) {
-  //   AddToInputBuffer(data);
-  //   return Status::OK();
-  // }
+  if (bytes_to_write <= AvailableInputSpace()) {
+    AddToInputBuffer(data);
+    return Status::OK();
+  }
 
   DMSG("Append(): Data is too large to fit input buffer");
   // `data` is too large to fit in input buffer so we deflate it directly.

@@ -23,6 +23,7 @@ limitations under the License.
 #include "tensorflow/core/protobuf/error_codes.pb.h"
 
 #include <zstd.h>
+#include <chrono>
 
 namespace tensorflow {
 namespace io {
@@ -33,23 +34,36 @@ static std::vector<int> InputBufferSizes() {
 
 static std::vector<int> OutputBufferSizes() { return {100, 200, 500, 1000}; }
 
-static std::vector<int> NumCopies() { return {1, 50, 500}; }
+static std::vector<int> NumCopies() { return {1, 50, 500, 5000}; }
+
+static std::vector<int> NumThreads() { return {0, 1, 2, 4, 8, 16, 32}; };
+
+static std::vector<int> Strategies() { return {1, 2, 3, 4, 5, 6, 7, 8, 9}; };
 
 static string GetRecord() {
-  static const string lorem_ipsum =
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
-      " Fusce vehicula tincidunt libero sit amet ultrices. Vestibulum non "
-      "felis augue. Duis vitae augue id lectus lacinia congue et ut purus. "
-      "Donec auctor, nisl at dapibus volutpat, diam ante lacinia dolor, vel"
-      "dignissim lacus nisi sed purus. Duis fringilla nunc ac lacus sagittis"
-      " efficitur. Praesent tincidunt egestas eros, eu vehicula urna ultrices"
-      " et. Aliquam erat volutpat. Maecenas vehicula risus consequat risus"
-      " dictum, luctus tincidunt nibh imperdiet. Aenean bibendum ac erat"
-      " cursus scelerisque. Cras lacinia in enim dapibus iaculis. Nunc porta"
-      " felis lectus, ac tincidunt massa pharetra quis. Fusce feugiat dolor"
-      " vel ligula rutrum egestas. Donec vulputate quam eros, et commodo"
-      " purus lobortis sed.";
-  return lorem_ipsum;
+  static const string el_dorado =
+      "Gaily bedight,"
+      "A gallant knight,"
+      "In sunshine and in shadow, Had journeyed long, Singing a song,"
+      "In search of Eldorado."
+      "But he grew old— This knight so bold— And o'er his heart a shadow— Fell"
+      "as he found No spot of ground That looked like Eldorado."
+      "And,"
+      "as his strength Failed him at length,"
+      "He met a pilgrim shadow— 'Shadow,' said he,"
+      "'Where can it be— This land of Eldorado ?'"
+      "'Over the Mountains Of the Moon, Down the Valley of the Shadow, Ride,"
+      "boldly ride,' The shade replied,— 'If you seek for Eldorado!'"
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut "
+      "condimentum, mauris sit amet euismod iaculis, sem dolor maximus turpis, "
+      "id cursus magna mauris eu lacus. Vivamus tincidunt ex vitae dolor "
+      "mattis sollicitudin. Nunc nec lacinia lacus. Maecenas sapien nulla, "
+      "volutpat eu maximus fermentum, sollicitudin id est. Nunc venenatis, "
+      "tortor eu pretium dignissim, enim leo elementum ex, nec fermentum ex "
+      "ipsum vitae velit. Ut commodo nunc vel nisi fringilla rhoncus. Cras ac "
+      "diam sapien. Etiam vel velit nec purus molestie gravida non a sem. "
+      "Pellentesque vulputate finibus eros sit amet placerat.";
+  return el_dorado;
 }
 
 static string GenTestString(int copies = 1) {
@@ -62,6 +76,38 @@ static string GenTestString(int copies = 1) {
 
 typedef io::ZstdCompressionOptions CompressionOptions;
 
+void WriteCompressedFile(Env* env, const string& fname, int input_buf_size,
+                         int output_buf_size,
+                         const CompressionOptions& output_options,
+                         const string& data) {
+  std::unique_ptr<WritableFile> file_writer;
+  TF_ASSERT_OK(env->NewWritableFile(fname, &file_writer));
+
+  ZstdOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
+                       output_options);
+
+  TF_ASSERT_OK(out.Append(StringPiece(data)));
+  TF_ASSERT_OK(out.Close());
+  TF_ASSERT_OK(file_writer->Flush());
+  TF_ASSERT_OK(file_writer->Close());
+}
+
+void ReadCompressedFile(Env* env, const string& fname, int input_buf_size,
+                        int output_buf_size,
+                        const CompressionOptions& input_options,
+                        const string& data) {
+  tstring result;
+  std::unique_ptr<RandomAccessFile> file_reader;
+  TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
+  std::unique_ptr<RandomAccessInputStream> input_stream(
+      new RandomAccessInputStream(file_reader.get()));
+
+  ZstdInputStream in(input_stream.get(), input_buf_size, output_buf_size,
+                     input_options);
+  TF_ASSERT_OK(in.ReadNBytes(data.size(), &result));
+  EXPECT_EQ(result, data);
+}
+
 void TestAllCombinations(CompressionOptions input_options,
                          CompressionOptions output_options) {
   Env* env = Env::Default();
@@ -72,35 +118,42 @@ void TestAllCombinations(CompressionOptions input_options,
     string data = GenTestString(file_size);
     for (auto input_buf_size : InputBufferSizes()) {
       for (auto output_buf_size : OutputBufferSizes()) {
-        std::unique_ptr<WritableFile> file_writer;
-        TF_ASSERT_OK(env->NewWritableFile(fname, &file_writer));
-        tstring result;
-
-        ZstdOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
-                             output_options);
-
-        TF_ASSERT_OK(out.Append(StringPiece(data)));
-        TF_ASSERT_OK(out.Close());
-        TF_ASSERT_OK(file_writer->Flush());
-        TF_ASSERT_OK(file_writer->Close());
-
-        std::unique_ptr<RandomAccessFile> file_reader;
-        TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
-        std::unique_ptr<RandomAccessInputStream> input_stream(
-            new RandomAccessInputStream(file_reader.get()));
-        ZstdInputStream in(input_stream.get(), input_buf_size, output_buf_size,
-                           input_options);
-        TF_ASSERT_OK(in.ReadNBytes(data.size(), &result));
-        EXPECT_EQ(result, data);
+        for (auto strategy : Strategies()) {
+          output_options.compression_strategy = strategy;
+          WriteCompressedFile(env, fname, input_buf_size, output_buf_size,
+                              output_options, data);
+          ReadCompressedFile(env, fname, input_buf_size, output_buf_size,
+                             input_options, data);
+        }
       }
     }
   }
 }
 
-TEST(ZlibBuffers, DefaultOptions) {
+TEST(ZstdBuffers, DefaultOptions) {
   TestAllCombinations(CompressionOptions::DEFAULT(),
                       CompressionOptions::DEFAULT());
 }
+
+void TestCompressionMultiThread(uint8 input_buf_size, uint8 output_buf_size) {
+  Env* env = Env::Default();
+  string fname;
+  CompressionOptions input_options = CompressionOptions::DEFAULT();
+  CompressionOptions output_options = CompressionOptions::DEFAULT();
+
+  ASSERT_TRUE(env->LocalTempFilename(&fname));
+  for (auto file_size : NumCopies()) {
+    for (auto num_threads : NumThreads()) {
+      string data = GenTestString(file_size);
+      WriteCompressedFile(env, fname, input_buf_size, output_buf_size,
+                          output_options, data);
+      ReadCompressedFile(env, fname, input_buf_size, output_buf_size,
+                         input_options, data);
+    }
+  }
+}
+
+TEST(ZstdBuffers, MultiThread) { TestCompressionMultiThread(500, 500); }
 
 void TestMultipleWrites(uint8 input_buf_size, uint8 output_buf_size,
                         int num_writes, bool with_flush = false) {
@@ -152,22 +205,6 @@ TEST(ZstdBuffers, MultipleWritesWithoutFlush) {
 
 TEST(ZstdBuffers, MultipleWritesWithFlush) {
   TestMultipleWrites(200, 200, 10, true);
-}
-
-void WriteCompressedFile(Env* env, const string& fname, int input_buf_size,
-                         int output_buf_size,
-                         const CompressionOptions& output_options,
-                         const string& data) {
-  std::unique_ptr<WritableFile> file_writer;
-  TF_ASSERT_OK(env->NewWritableFile(fname, &file_writer));
-
-  ZstdOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
-                       output_options);
-
-  TF_ASSERT_OK(out.Append(StringPiece(data)));
-  TF_ASSERT_OK(out.Close());
-  TF_ASSERT_OK(file_writer->Flush());
-  TF_ASSERT_OK(file_writer->Close());
 }
 
 void TestTell(CompressionOptions input_options,

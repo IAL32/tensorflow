@@ -97,8 +97,8 @@ size_t ZstdInputStream::ReadBytesFromCache(size_t bytes_to_read,
     DMSG("ReadBytesFromCache(): cached_result: '" << cached_result << "'");
 
     result->append(next_unread_byte_, can_read_bytes);
-    next_unread_byte_ += can_read_bytes;
   }
+  next_unread_byte_ += can_read_bytes;
   unread_bytes_ -= can_read_bytes;
   bytes_read_ += can_read_bytes;
   return can_read_bytes;
@@ -159,14 +159,15 @@ Status ZstdInputStream::Inflate() {
     return errors::DataLoss(error_string);
   }
 
-  // DMSG("ZSTD_nextSrcSizeToDecompress(): "
-  //      << ZSTD_nextSrcSizeToDecompress(context_));
+  DMSG("ZSTD_nextSrcSizeToDecompress(): "
+       << ZSTD_nextSrcSizeToDecompress(context_));
 
   tstring result;
   result.append(next_unread_byte_, output.pos);
 
   DMSG("Inflate(): last_return_: "
        << last_return_ << ", input.pos: " << zstd_input_buffer_.pos
+       << ", input.size: " << zstd_input_buffer_.size
        << ", output.pos: " << output.pos << ", output.size: " << output.size
        << ", result: '" << result << "'");
 
@@ -202,12 +203,10 @@ Status ZstdInputStream::ReadFromStream() {
 
   DMSG("ReadFromStream(): data: '" << data << "'");
 
-  next_in_byte_ = input_buffer_.get();
-
   // Note: data.size() could be different from bytes_to_read.
   avail_in_ += data.size();
   zstd_input_buffer_.pos = 0;
-  zstd_input_buffer_.size = avail_in_;
+  zstd_input_buffer_.size = data.size();
 
   if (!s.ok() && !errors::IsOutOfRange(s)) {
     return s;
