@@ -106,11 +106,9 @@ class ZstdOutputBuffer : public WritableFile {
   // Returns the total space available in `input_buffer_`.
   int32 AvailableInputSpace() const;
 
-  Status DeflateBuffered(bool last_chunk);
-
   Status FlushOutputBufferToFile();
 
-  Status Deflate(bool last_chunk);
+  Status Deflate(ZSTD_EndDirective end_directive);
 
   WritableFile* file_;  // Not owned
   size_t input_buffer_capacity_;

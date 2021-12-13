@@ -86,13 +86,13 @@ Status ZstdOutputBuffer::Append(StringPiece data) {
   // If there isn't enough available space in the input_buffer_ we empty it
   // by uncompressing its contents. If data now fits in input_buffer_
   // we add it there else we directly deflate it.
-  TF_RETURN_IF_ERROR(DeflateBuffered(false));
+  // TF_RETURN_IF_ERROR(DeflateBuffered(false));
 
   // At this point input stream should be empty.
-  if (bytes_to_write <= AvailableInputSpace()) {
-    AddToInputBuffer(data);
-    return Status::OK();
-  }
+  // if (bytes_to_write <= AvailableInputSpace()) {
+  //   AddToInputBuffer(data);
+  //   return Status::OK();
+  // }
 
   DMSG("Append(): Data is too large to fit input buffer");
   // `data` is too large to fit in input buffer so we deflate it directly.
@@ -101,7 +101,7 @@ Status ZstdOutputBuffer::Append(StringPiece data) {
   next_in_ = const_cast<char*>(data.data());
   avail_in_ = bytes_to_write;
 
-  TF_RETURN_IF_ERROR(Deflate(true));
+  TF_RETURN_IF_ERROR(Deflate(ZSTD_e_end));
 
   DCHECK_EQ(avail_in_, 0);  // All input used up.
 
@@ -157,10 +157,10 @@ Status ZstdOutputBuffer::Append(const absl::Cord& cord) {
 
 Status ZstdOutputBuffer::Close() {
   // Given that we do not own `file`, we don't close it.
-  TF_RETURN_IF_ERROR(DeflateBuffered(true));
+  TF_RETURN_IF_ERROR(Deflate(ZSTD_e_end));
   TF_RETURN_IF_ERROR(FlushOutputBufferToFile());
   ZSTD_freeCCtx(context_);
-  return Flush();
+  return Status::OK();
 }
 
 Status ZstdOutputBuffer::Name(StringPiece* result) const {
@@ -175,7 +175,7 @@ Status ZstdOutputBuffer::Sync() {
 Status ZstdOutputBuffer::Tell(int64* position) { return file_->Tell(position); }
 
 Status ZstdOutputBuffer::Flush() {
-  TF_RETURN_IF_ERROR(DeflateBuffered(false));
+  TF_RETURN_IF_ERROR(Deflate(ZSTD_e_flush));
   TF_RETURN_IF_ERROR(FlushOutputBufferToFile());
   return file_->Flush();
 }
@@ -184,27 +184,9 @@ int32 ZstdOutputBuffer::AvailableInputSpace() const {
   return input_buffer_capacity_ - avail_in_;
 }
 
-Status ZstdOutputBuffer::DeflateBuffered(bool last_chunk) {
-  DMSG("DeflateBuffered(): avail_out_: " << avail_out_
-                                         << ", avail_in_: " << avail_in_);
-  do {
-    if (avail_out_ == 0) {
-      // No available output space.
-      // Write output buffer to file.
-      TF_RETURN_IF_ERROR(FlushOutputBufferToFile());
-    }
-    TF_RETURN_IF_ERROR(Deflate(last_chunk));
-  } while (avail_out_ == 0);
-
-  DCHECK_EQ(avail_in_, 0);  // We have used all the input
-
-  // Restore z_stream input pointers.
-  next_in_ = input_buffer_.get();
-  return Status::OK();
-}
-
 Status ZstdOutputBuffer::FlushOutputBufferToFile() {
   size_t bytes_to_write = output_buffer_capacity_ - avail_out_;
+  DMSG("FlushOutputBufferToFile(): bytes_to_write: " << bytes_to_write);
   if (bytes_to_write > 0) {
     Status s = file_->Append(StringPiece(
         reinterpret_cast<char*>(output_buffer_.get()), bytes_to_write));
@@ -218,13 +200,11 @@ Status ZstdOutputBuffer::FlushOutputBufferToFile() {
   return Status::OK();
 }
 
-Status ZstdOutputBuffer::Deflate(bool last_chunk) {
+Status ZstdOutputBuffer::Deflate(ZSTD_EndDirective end_directive) {
   DMSG("Deflate(): avail_in_: " << avail_in_);
   if (avail_in_ == 0) {
     return Status::OK();
   }
-
-  const ZSTD_EndDirective mode = last_chunk ? ZSTD_e_end : ZSTD_e_continue;
 
   // tstring data;
   // data.append(next_in_, avail_in_);
@@ -233,14 +213,15 @@ Status ZstdOutputBuffer::Deflate(bool last_chunk) {
   //           << "\tdata: '" << data << "'" << std::endl;
 
   ZSTD_inBuffer input = {next_in_, avail_in_, 0};
+
   bool finished;
   do {
     ZSTD_outBuffer output = {next_out_, avail_out_, 0};
 
     const size_t remaining =
-        ZSTD_compressStream2(context_, &output, &input, mode);
+        ZSTD_compressStream2(context_, &output, &input, end_directive);
     if (ZSTD_isError(remaining)) {
-      return errors::Internal(ZSTD_getErrorName(remaining));
+      return errors::DataLoss(ZSTD_getErrorName(remaining));
     }
 
     avail_out_ = output_buffer_capacity_ - output.pos;
@@ -255,7 +236,8 @@ Status ZstdOutputBuffer::Deflate(bool last_chunk) {
 
     TF_RETURN_IF_ERROR(FlushOutputBufferToFile());
 
-    finished = last_chunk ? (remaining == 0) : (input.pos == input.size);
+    finished = end_directive == ZSTD_e_end ? (remaining == 0)
+                                           : (input.pos == input.size);
   } while (!finished);
 
   avail_in_ = 0;

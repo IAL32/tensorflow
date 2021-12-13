@@ -45,7 +45,7 @@ cc_library(
     copts = [
         "-DZSTD_MULTITHREAD",
         "-DXXH_NAMESPACE=ZSTD_",
-        "-DDEBUGLEVEL=5", # FIXME: @IAL32 remove when done
+        # "-DDEBUGLEVEL=5", # FIXME: @IAL32 remove when done
     ],
     includes = ["lib/"],
     linkopts = select({

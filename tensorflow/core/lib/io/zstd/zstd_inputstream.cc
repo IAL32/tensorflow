@@ -20,7 +20,7 @@ limitations under the License.
 #include "tensorflow/core/platform/strcat.h"
 
 // FIXME: debug info
-#define DEBUG 1
+// #define DEBUG 1
 
 #ifdef DEBUG
 #define DMSG(str)                  \
@@ -99,20 +99,21 @@ size_t ZstdInputStream::ReadBytesFromCache(size_t bytes_to_read,
     result->append(next_unread_byte_, can_read_bytes);
     next_unread_byte_ += can_read_bytes;
   }
+  unread_bytes_ -= can_read_bytes;
   bytes_read_ += can_read_bytes;
   return can_read_bytes;
 }
 
 Status ZstdInputStream::ReadNBytes(int64 bytes_to_read, tstring* result) {
   result->clear();
+  DMSG("ReadNBytes(): bytes_to_read: " << bytes_to_read
+                                       << ", unread_bytes_: " << unread_bytes_);
 
   bytes_to_read -= ReadBytesFromCache(bytes_to_read, result);
 
-  DMSG("ReadNBytes(): bytes_to_read: " << bytes_to_read);
-
   while (bytes_to_read > 0) {
     // No bytes should be left in the cache.
-    DCHECK_EQ(unread_bytes_, 0);
+    CHECK_EQ(unread_bytes_, 0);
 
     // Now that the cache is empty we need to inflate more data.
     next_unread_byte_ = output_buffer_.get();
@@ -121,7 +122,6 @@ Status ZstdInputStream::ReadNBytes(int64 bytes_to_read, tstring* result) {
 
     // If no progress was made by inflate, read more compressed data from the
     // input stream.
-    DMSG("ReadNBytes(): unread_bytes_: " << unread_bytes_);
     if (unread_bytes_ == 0) {
       TF_RETURN_IF_ERROR(ReadFromStream());
     } else {
@@ -157,8 +157,8 @@ Status ZstdInputStream::Inflate() {
     return errors::DataLoss(error_string);
   }
 
-  DMSG("ZSTD_nextSrcSizeToDecompress(): "
-       << ZSTD_nextSrcSizeToDecompress(context_));
+  // DMSG("ZSTD_nextSrcSizeToDecompress(): "
+  //      << ZSTD_nextSrcSizeToDecompress(context_));
 
   tstring result;
   result.append(next_unread_byte_, output.pos);

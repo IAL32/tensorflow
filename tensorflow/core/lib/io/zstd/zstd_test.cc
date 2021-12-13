@@ -102,8 +102,59 @@ void TestAllCombinations(CompressionOptions input_options,
 }
 
 TEST(ZlibBuffers, DefaultOptions) {
-  // TestAllCombinations(CompressionOptions::DEFAULT(),
-  //                     CompressionOptions::DEFAULT());
+  TestAllCombinations(CompressionOptions::DEFAULT(),
+                      CompressionOptions::DEFAULT());
+}
+
+void TestMultipleWrites(uint8 input_buf_size, uint8 output_buf_size,
+                        int num_writes, bool with_flush = false) {
+  Env* env = Env::Default();
+  CompressionOptions input_options = CompressionOptions::DEFAULT();
+  CompressionOptions output_options = CompressionOptions::DEFAULT();
+
+  string fname;
+  ASSERT_TRUE(env->LocalTempFilename(&fname));
+  string data = GenTestString();
+  std::unique_ptr<WritableFile> file_writer;
+  string actual_result;
+  string expected_result;
+
+  std::cout << "Tmp file: " << fname << std::endl;
+
+  TF_ASSERT_OK(env->NewWritableFile(fname, &file_writer));
+  ZstdOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
+                       output_options);
+
+  for (int i = 0; i < num_writes; i++) {
+    TF_ASSERT_OK(out.Append(StringPiece(data)));
+    if (with_flush) {
+      TF_ASSERT_OK(out.Flush());
+    }
+    strings::StrAppend(&expected_result, data);
+  }
+  TF_ASSERT_OK(out.Close());
+  TF_ASSERT_OK(file_writer->Flush());
+  TF_ASSERT_OK(file_writer->Close());
+
+  std::unique_ptr<RandomAccessFile> file_reader;
+  TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
+  std::unique_ptr<RandomAccessInputStream> input_stream(
+      new RandomAccessInputStream(file_reader.get()));
+  ZstdInputStream in(input_stream.get(), input_buf_size, output_buf_size,
+                     input_options);
+
+  for (int i = 0; i < num_writes; i++) {
+    tstring decompressed_output;
+    TF_ASSERT_OK(in.ReadNBytes(data.size(), &decompressed_output));
+    std::cout << "TEST(): new read" << std::endl << std::endl;
+    strings::StrAppend(&actual_result, decompressed_output);
+  }
+
+  EXPECT_EQ(actual_result, expected_result);
+}
+
+TEST(ZstdBuffers, MultipleWritesWithoutFlush) {
+  TestMultipleWrites(200, 200, 10);
 }
 
 void TestWrite(uint8 input_buf_size, uint8 output_buf_size,
@@ -289,12 +340,12 @@ void ReferenceWriteRead() {
   const size_t written_bytes =
       ZstdReferenceCompress(file_writer.get(), &data, output_buf_size);
 
-  TF_ASSERT_OK(out.Append(StringPiece(data)));
+  // TF_ASSERT_OK(out.Append(StringPiece(data)));
 
   TF_ASSERT_OK(file_writer->Flush());
   TF_ASSERT_OK(file_writer->Close());
 
-  size_t written_bytes = 421;  // for GenTestString(1);
+  // size_t written_bytes = 421;  // for GenTestString(1);
   // size_t written_bytes = 447;  // for GenTestString(500);
 
   std::unique_ptr<RandomAccessFile> file_reader;
