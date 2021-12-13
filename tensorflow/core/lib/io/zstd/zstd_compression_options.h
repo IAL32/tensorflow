@@ -42,6 +42,17 @@ class ZstdCompressionOptions {
   int8 compression_level;
 
   // From the zstd manual: https://facebook.github.io/zstd/zstd_manual.html#Chapter5
+  // Maximum allowed back-reference distance, expressed as power of 2.
+  // This will set a memory budget for streaming decompression,
+  // with larger values requiring more memory
+  // and typically compressing more.
+  // Must be clamped between ZSTD_WINDOWLOG_MIN and ZSTD_WINDOWLOG_MAX.
+  // Special: value 0 means "use default windowLog".
+  // Note: Using a windowLog greater than ZSTD_WINDOWLOG_LIMIT_DEFAULT
+  //       requires explicitly allowing such size at streaming decompression stage.
+  int8 window_log;
+
+  // From the zstd manual: https://facebook.github.io/zstd/zstd_manual.html#Chapter5
   // Corresponds to ZSTD_c_nbWorkers
   // Select how many threads will be spawned to compress in parallel.
   // When nbWorkers >= 1, triggers asynchronous mode when invoking ZSTD_compressStream*() :

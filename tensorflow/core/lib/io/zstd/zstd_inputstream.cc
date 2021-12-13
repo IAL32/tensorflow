@@ -128,6 +128,8 @@ Status ZstdInputStream::ReadNBytes(int64 bytes_to_read, tstring* result) {
       bytes_to_read -= ReadBytesFromCache(bytes_to_read, result);
     }
   }
+
+  return Status::OK();
 }
 
 #if defined(TF_CORD_SUPPORT)
@@ -211,14 +213,6 @@ Status ZstdInputStream::ReadFromStream() {
     return s;
   }
 
-  // We throw OutOfRange error iff no new data has been read from stream.
-  // Since we never check how much data is remaining in the stream, it is
-  // possible that on the last read there isn't enough data in the stream to
-  // fill up the buffer in which case input_stream_->ReadNBytes would return an
-  // OutOfRange error.
-  // if (data.empty()) {
-  //   return errors::OutOfRange("EOF reached");
-  // }
   if (errors::IsOutOfRange(s)) {
     return Status::OK();
   }

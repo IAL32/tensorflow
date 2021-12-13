@@ -72,10 +72,6 @@ void TestAllCombinations(CompressionOptions input_options,
     string data = GenTestString(file_size);
     for (auto input_buf_size : InputBufferSizes()) {
       for (auto output_buf_size : OutputBufferSizes()) {
-        std::cout << "num_copies: " << file_size
-                  << ", input_buf_size: " << input_buf_size
-                  << ", output_buf_size: " << output_buf_size << std::endl
-                  << std::endl;
         std::unique_ptr<WritableFile> file_writer;
         TF_ASSERT_OK(env->NewWritableFile(fname, &file_writer));
         tstring result;
@@ -119,8 +115,6 @@ void TestMultipleWrites(uint8 input_buf_size, uint8 output_buf_size,
   string actual_result;
   string expected_result;
 
-  std::cout << "Tmp file: " << fname << std::endl;
-
   TF_ASSERT_OK(env->NewWritableFile(fname, &file_writer));
   ZstdOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
                        output_options);
@@ -146,7 +140,6 @@ void TestMultipleWrites(uint8 input_buf_size, uint8 output_buf_size,
   for (int i = 0; i < num_writes; i++) {
     tstring decompressed_output;
     TF_ASSERT_OK(in.ReadNBytes(data.size(), &decompressed_output));
-    std::cout << "TEST(): new read" << std::endl << std::endl;
     strings::StrAppend(&actual_result, decompressed_output);
   }
 
@@ -157,47 +150,75 @@ TEST(ZstdBuffers, MultipleWritesWithoutFlush) {
   TestMultipleWrites(200, 200, 10);
 }
 
-void TestWrite(uint8 input_buf_size, uint8 output_buf_size,
-               bool with_flush = false) {
-  Env* env = Env::Default();
-  CompressionOptions input_options = CompressionOptions::DEFAULT();
-  CompressionOptions output_options = CompressionOptions::DEFAULT();
+TEST(ZstdBuffers, MultipleWritesWithFlush) {
+  TestMultipleWrites(200, 200, 10, true);
+}
 
-  string fname;
-  ASSERT_TRUE(env->LocalTempFilename(&fname));
-  string data = GenTestString(500);
+void WriteCompressedFile(Env* env, const string& fname, int input_buf_size,
+                         int output_buf_size,
+                         const CompressionOptions& output_options,
+                         const string& data) {
   std::unique_ptr<WritableFile> file_writer;
-  tstring result;
-
-  std::cout << "datasize: " << data.size()
-            << ", data (last 10): " << data.substr(data.size() - 10)
-            << std::endl
-            << std::endl;
-
   TF_ASSERT_OK(env->NewWritableFile(fname, &file_writer));
+
   ZstdOutputBuffer out(file_writer.get(), input_buf_size, output_buf_size,
                        output_options);
 
-  std::cout << "Tmp file: " << fname << std::endl;
-
   TF_ASSERT_OK(out.Append(StringPiece(data)));
-
   TF_ASSERT_OK(out.Close());
   TF_ASSERT_OK(file_writer->Flush());
   TF_ASSERT_OK(file_writer->Close());
-
-  std::unique_ptr<RandomAccessFile> file_reader;
-  TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
-  std::unique_ptr<RandomAccessInputStream> input_stream(
-      new RandomAccessInputStream(file_reader.get()));
-
-  ZstdInputStream in(input_stream.get(), input_buf_size, output_buf_size,
-                     input_options);
-  TF_ASSERT_OK(in.ReadNBytes(data.size(), &result));
-  EXPECT_EQ(result, data);
 }
 
-TEST(ZstdBuffers, SingleWrite) { TestWrite(100, 100, false); }
+void TestTell(CompressionOptions input_options,
+              CompressionOptions output_options) {
+  Env* env = Env::Default();
+  string fname;
+  ASSERT_TRUE(env->LocalTempFilename(&fname));
+  for (auto file_size : NumCopies()) {
+    string data = GenTestString(file_size);
+    for (auto input_buf_size : InputBufferSizes()) {
+      for (auto output_buf_size : OutputBufferSizes()) {
+        // Write the compressed file.
+
+        WriteCompressedFile(env, fname, input_buf_size, output_buf_size,
+                            output_options, data);
+
+        // Boiler-plate to set up ZstdInputStream.
+        std::unique_ptr<RandomAccessFile> file_reader;
+        TF_ASSERT_OK(env->NewRandomAccessFile(fname, &file_reader));
+        std::unique_ptr<RandomAccessInputStream> input_stream(
+            new RandomAccessInputStream(file_reader.get()));
+        ZstdInputStream in(input_stream.get(), input_buf_size, output_buf_size,
+                           input_options);
+
+        tstring first_half(string(data, 0, data.size() / 2));
+        tstring bytes_read;
+
+        // Read the first half of the uncompressed file and expect that Tell()
+        // returns half the uncompressed length of the file.
+        TF_ASSERT_OK(in.ReadNBytes(first_half.size(), &bytes_read));
+        EXPECT_EQ(in.Tell(), first_half.size());
+        EXPECT_EQ(bytes_read, first_half);
+
+        // Read the remaining half of the uncompressed file and expect that
+        // Tell() points past the end of file.
+        tstring second_half;
+        TF_ASSERT_OK(
+            in.ReadNBytes(data.size() - first_half.size(), &second_half));
+        EXPECT_EQ(in.Tell(), data.size());
+        bytes_read.append(second_half);
+
+        // Expect that the file is correctly read.
+        EXPECT_EQ(bytes_read, data);
+      }
+    }
+  }
+}
+
+TEST(ZstdInputStream, TellDefaultOptions) {
+  TestTell(CompressionOptions::DEFAULT(), CompressionOptions::DEFAULT());
+}
 
 size_t ZstdReferenceCompress(WritableFile* file_writer, string* data,
                              size_t buffOutSize) {
@@ -207,7 +228,7 @@ size_t ZstdReferenceCompress(WritableFile* file_writer, string* data,
   const size_t cLevel = ZSTD_CLEVEL_DEFAULT;
   const size_t nbThreads = 0;
 
-  std::cout << "Original data size: " << data->size() << std::endl;
+  // std::cout << "Original data size: " << data->size() << std::endl;
 
   /* Set any parameters you want.
    * Here we set the compression level, and enable the checksum.
@@ -226,7 +247,7 @@ size_t ZstdReferenceCompress(WritableFile* file_writer, string* data,
 
   tstring to_compress_data;
   to_compress_data.append(data->c_str() + input.pos, input.size - input.pos);
-  std::cout << "Compressing data: '" << to_compress_data << "'" << std::endl;
+  // std::cout << "Compressing data: '" << to_compress_data << "'" << std::endl;
 
   do {
     /* Compress into the output buffer and write all of the output to
@@ -237,16 +258,16 @@ size_t ZstdReferenceCompress(WritableFile* file_writer, string* data,
     tstring compressed_data;
     written_bytes += output.pos;
     compressed_data.append(reinterpret_cast<char*>(buffOut), output.pos);
-    std::cout << "Compressed data: '" << compressed_data << "'" << std::endl;
+    // std::cout << "Compressed data: '" << compressed_data << "'" << std::endl;
     file_writer->Append(compressed_data);
     /* If we're on the last chunk we're finished when zstd returns 0,
      * which means its consumed all the input AND finished the frame.
      * Otherwise, we're finished when we've consumed all the input.
      */
 
-    std::cout << "remaining: " << remaining << std::endl;
+    // std::cout << "remaining: " << remaining << std::endl;
     finished = lastChunk ? (remaining == 0) : (input.pos == input.size);
-    std::cout << "input.pos: " << input.pos << std::endl;
+    // std::cout << "input.pos: " << input.pos << std::endl;
   } while (!finished);
 
   ZSTD_freeCCtx(cctx);
@@ -268,9 +289,9 @@ tstring ZstdReferenceDecompress(char* compressed_data, size_t size,
 
   size_t lastRet = 0;
 
-  std::cout << "size: " << size << std::endl;
+  // std::cout << "size: " << size << std::endl;
   while (totalRead < size) {
-    std::cout << "totalRead: " << totalRead << std::endl;
+    // std::cout << "totalRead: " << totalRead << std::endl;
     ZSTD_inBuffer input = {nextIn, read, 0};
 
     /* Given a valid frame, zstd won't consume the last byte of the frame
@@ -295,11 +316,12 @@ tstring ZstdReferenceDecompress(char* compressed_data, size_t size,
       tstring tmp;
       tmp.append(reinterpret_cast<char*>(buffOut), output.pos);
       result.append(reinterpret_cast<char*>(buffOut), output.pos);
-      std::cout << "Uncompressed: " << tmp << std::endl;
+      // std::cout << "Uncompressed: " << tmp << std::endl;
       lastRet = ret;
 
-      std::cout << "input.pos: " << input.pos << ", input.size: " << input.size
-                << std::endl;
+      // std::cout << "input.pos: " << input.pos << ", input.size: " <<
+      // input.size
+      //           << std::endl;
     }
 
     nextIn += read;
@@ -331,7 +353,7 @@ void ReferenceWriteRead() {
   std::unique_ptr<WritableFile> file_writer;
   tstring compressed_data;
 
-  std::cout << "Tmp file: " << fname << std::endl;
+  // std::cout << "Tmp file: " << fname << std::endl;
 
   TF_ASSERT_OK(env->NewWritableFile(fname, &file_writer));
   const size_t input_buf_size = 100;
@@ -354,7 +376,7 @@ void ReferenceWriteRead() {
       new RandomAccessInputStream(file_reader.get()));
 
   TF_ASSERT_OK(input_stream->ReadNBytes(written_bytes, &compressed_data));
-  std::cout << "compressed_data: " << compressed_data << std::endl;
+  // std::cout << "compressed_data: " << compressed_data << std::endl;
 
   tstring result = ZstdReferenceDecompress(
       compressed_data.data(), written_bytes, input_buf_size, output_buf_size);
