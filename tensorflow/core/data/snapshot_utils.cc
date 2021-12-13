@@ -190,18 +190,26 @@ Status CustomWriter::Initialize(tensorflow::Env* env) {
   }
 #else   // IS_SLIM_BUILD
   if (compression_type_ == io::compression::kGzip) {
-    zlib_underlying_dest_.swap(dest_);
+    underlying_dest_.swap(dest_);
     io::ZlibCompressionOptions zlib_options;
     zlib_options = io::ZlibCompressionOptions::GZIP();
 
     io::ZlibOutputBuffer* zlib_output_buffer = new io::ZlibOutputBuffer(
-        zlib_underlying_dest_.get(), zlib_options.input_buffer_size,
+        underlying_dest_.get(), zlib_options.input_buffer_size,
         zlib_options.output_buffer_size, zlib_options);
     TF_CHECK_OK(zlib_output_buffer->Init());
     dest_.reset(zlib_output_buffer);
+  } else if (compression_type_ == io::compression::kZstd) {
+    underlying_dest_.swap(dest_);
+    io::ZstdCompressionOptions zstd_options =
+        io::ZstdCompressionOptions::DEFAULT();
+
+    io::ZstdOutputBuffer* zstd_output_buffer = new io::ZstdOutputBuffer(
+        underlying_dest_.get(), zstd_options.input_buffer_size,
+        zstd_options.output_buffer_size, zstd_options);
+    TF_CHECK_OK(zstd_output_buffer->Init());
+    dest_.reset(zstd_output_buffer);
   }
-  // FIXME: @IAL32
-  // Add ZSTD?
 #endif  // IS_SLIM_BUILD
   simple_tensor_mask_.reserve(dtypes_.size());
   for (const auto& dtype : dtypes_) {
@@ -307,9 +315,9 @@ Status CustomWriter::Close() {
     TF_RETURN_IF_ERROR(dest_->Close());
     dest_ = nullptr;
   }
-  if (zlib_underlying_dest_ != nullptr) {
-    TF_RETURN_IF_ERROR(zlib_underlying_dest_->Close());
-    zlib_underlying_dest_ = nullptr;
+  if (underlying_dest_ != nullptr) {
+    TF_RETURN_IF_ERROR(underlying_dest_->Close());
+    underlying_dest_ = nullptr;
   }
   return Status::OK();
 }

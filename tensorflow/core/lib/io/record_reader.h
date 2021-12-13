@@ -22,9 +22,10 @@ limitations under the License.
 #if !defined(IS_SLIM_BUILD)
 #include "tensorflow/core/lib/io/snappy/snappy_compression_options.h"
 #include "tensorflow/core/lib/io/snappy/snappy_inputstream.h"
-#include "tensorflow/core/lib/io/zstd/zstd_compression_options.h"
 #include "tensorflow/core/lib/io/zlib_compression_options.h"
 #include "tensorflow/core/lib/io/zlib_inputstream.h"
+#include "tensorflow/core/lib/io/zstd/zstd_compression_options.h"
+#include "tensorflow/core/lib/io/zstd/zstd_inputstream.h"
 #endif  // IS_SLIM_BUILD
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
