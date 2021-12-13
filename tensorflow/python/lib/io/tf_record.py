@@ -60,6 +60,8 @@ class TFRecordOptions(object):
                compression_method=None,
                mem_level=None,
                compression_strategy=None,
+               zstd_input_buffer_size=None,
+               zstd_output_buffer_size=None,
                zstd_nb_workers=None,
                zstd_compression_level=None,
                zstd_compression_strategy=None,
@@ -85,6 +87,8 @@ class TFRecordOptions(object):
       compression_method: compression method or `None`.
       mem_level: 1 to 9, or `None`.
       compression_strategy: strategy or `None`. Default: Z_DEFAULT_STRATEGY.
+      zstd_input_buffer_size: int or `None`. 
+      zstd_output_buffer_size: int or `None`.
       zstd_nb_workers: int or `None`.
       zstd_compression_level: 0 to 19, or `None`. Default: ZSTD_CLEVEL_DEFAULT.
       zstd_compression_strategy: 0 to 9, or `None`. Default: 0.
@@ -109,6 +113,8 @@ class TFRecordOptions(object):
     self.compression_method = compression_method
     self.mem_level = mem_level
     self.compression_strategy = compression_strategy
+    self.zstd_input_buffer_size = zstd_input_buffer_size
+    self.zstd_output_buffer_size = zstd_output_buffer_size
     self.zstd_nb_workers = zstd_nb_workers
     self.zstd_compression_level = zstd_compression_level
     self.zstd_compression_strategy = zstd_compression_strategy
@@ -162,6 +168,10 @@ class TFRecordOptions(object):
       options.zlib_options.mem_level = self.mem_level
     if self.compression_strategy is not None:
       options.zlib_options.compression_strategy = self.compression_strategy
+    if self.zstd_input_buffer_size is not None:
+      options.zstd_options.input_zstd_input_buffer_size = self.zstd_input_buffer_size
+    if self.zstd_output_buffer_size is not None:
+      options.zstd_options.outzstd_output_buffer_size = self.zstd_output_buffer_size
     if self.zstd_nb_workers is not None:
       options.zstd_options.nb_workers = self.zstd_nb_workers
     if self.zstd_compression_level is not None:
