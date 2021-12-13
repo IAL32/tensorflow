@@ -16,6 +16,7 @@ limitations under the License.
 #ifndef TENSORFLOW_CORE_LIB_IO_ZSTD_ZSTD_INPUTSTREAM_H_
 #define TENSORFLOW_CORE_LIB_IO_ZSTD_ZSTD_INPUTSTREAM_H_
 
+#define ZSTD_STATIC_LINKING_ONLY
 #include <zstd.h>
 
 #include "tensorflow/core/lib/io/inputstream_interface.h"

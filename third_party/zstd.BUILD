@@ -45,14 +45,15 @@ cc_library(
     copts = [
         "-DZSTD_MULTITHREAD",
         "-DXXH_NAMESPACE=ZSTD_",
+        "-DDEBUGLEVEL=5", # FIXME: @IAL32 remove when done
     ],
+    includes = ["lib/"],
     linkopts = select({
         "@org_tensorflow//tensorflow:windows": [],
         "//conditions:default": [
             "-lpthread",
         ],
     }),
-    includes = ["lib/"],
 )
 
 # This is a Copybara sync helper for Google.

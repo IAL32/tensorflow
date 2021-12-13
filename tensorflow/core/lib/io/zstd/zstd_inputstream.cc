@@ -19,6 +19,20 @@ limitations under the License.
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/strcat.h"
 
+// FIXME: debug info
+#define DEBUG 1
+
+#ifdef DEBUG
+#define DMSG(str)                  \
+  do {                             \
+    std::cout << str << std::endl; \
+  } while (false)
+#else
+#define DMSG(str) \
+  do {            \
+  } while (false)
+#endif
+
 namespace tensorflow {
 namespace io {
 
@@ -75,9 +89,13 @@ Status ZstdInputStream::Reset() {
 size_t ZstdInputStream::ReadBytesFromCache(size_t bytes_to_read,
                                            tstring* result) {
   size_t can_read_bytes = std::min(bytes_to_read, unread_bytes_);
-  std::cout << "ReadBytesFromCache(): can_read_bytes: " << can_read_bytes
-            << std::endl;
+  DMSG("ReadBytesFromCache(): can_read_bytes: " << can_read_bytes);
   if (can_read_bytes > 0) {
+    tstring cached_result;
+    cached_result.append(next_unread_byte_, can_read_bytes);
+
+    DMSG("ReadBytesFromCache(): cached_result: '" << cached_result << "'");
+
     result->append(next_unread_byte_, can_read_bytes);
     next_unread_byte_ += can_read_bytes;
   }
@@ -90,7 +108,7 @@ Status ZstdInputStream::ReadNBytes(int64 bytes_to_read, tstring* result) {
 
   bytes_to_read -= ReadBytesFromCache(bytes_to_read, result);
 
-  std::cout << "ReadNBytes(): bytes_to_read: " << bytes_to_read << std::endl;
+  DMSG("ReadNBytes(): bytes_to_read: " << bytes_to_read);
 
   while (bytes_to_read > 0) {
     // No bytes should be left in the cache.
@@ -98,13 +116,12 @@ Status ZstdInputStream::ReadNBytes(int64 bytes_to_read, tstring* result) {
 
     // Now that the cache is empty we need to inflate more data.
     next_unread_byte_ = output_buffer_.get();
-    zstd_input_buffer_.pos = 0;
 
     TF_RETURN_IF_ERROR(Inflate());
 
     // If no progress was made by inflate, read more compressed data from the
     // input stream.
-    std::cout << "ReadNBytes(): unread_bytes_: " << unread_bytes_ << std::endl;
+    DMSG("ReadNBytes(): unread_bytes_: " << unread_bytes_);
     if (unread_bytes_ == 0) {
       TF_RETURN_IF_ERROR(ReadFromStream());
     } else {
@@ -125,27 +142,31 @@ Status ZstdInputStream::ReadNBytes(int64 bytes_to_read, absl::Cord* result) {
 #endif
 
 Status ZstdInputStream::Inflate() {
-  std::cout << "Inflate(): input.pos: " << zstd_input_buffer_.pos
-            << ", input.size: " << zstd_input_buffer_.size << std::endl;
+  DMSG("Inflate(): input.pos: " << zstd_input_buffer_.pos
+                                << ", input.size: " << zstd_input_buffer_.size);
 
-  ZSTD_outBuffer output = {output_buffer_.get(), output_buffer_capacity_, 0};
+  ZSTD_outBuffer output = {next_unread_byte_, output_buffer_capacity_, 0};
   last_return_ = ZSTD_decompressStream(context_, &output, &zstd_input_buffer_);
 
   if (ZSTD_isError(last_return_)) {
     string error_name = ZSTD_getErrorName(last_return_);
-    string error_string =
-        strings::StrCat("ZSTD_decompressStream: ", error_name);
+    string error_string = strings::StrCat(
+        "ZSTD_decompressStream: ", error_name, ", last_return_: ", last_return_,
+        ", output_buffer_capacity_: ", output_buffer_capacity_,
+        ", output.pos: ", output.pos, ", bytes_read_: ", bytes_read_);
     return errors::DataLoss(error_string);
   }
 
-  tstring result;
-  result.append(output_buffer_.get(), output_buffer_capacity_);
+  DMSG("ZSTD_nextSrcSizeToDecompress(): "
+       << ZSTD_nextSrcSizeToDecompress(context_));
 
-  std::cout << "Inflate(): last_return_: " << last_return_
-            << ", input.pos: " << zstd_input_buffer_.pos
-            << ", output.pos: " << output.pos
-            << ", output.size: " << output.size << ", result: '" << result
-            << "'" << std::endl;
+  tstring result;
+  result.append(next_unread_byte_, output.pos);
+
+  DMSG("Inflate(): last_return_: "
+       << last_return_ << ", input.pos: " << zstd_input_buffer_.pos
+       << ", output.pos: " << output.pos << ", output.size: " << output.size
+       << ", result: '" << result << "'");
 
   avail_in_ = 0;
   unread_bytes_ = output.pos;
@@ -157,8 +178,8 @@ Status ZstdInputStream::ReadFromStream() {
   size_t bytes_to_read = input_buffer_capacity_;
   char* read_location = input_buffer_.get();
 
-  std::cout << "ReadFromStream(): bytes_to_read: " << bytes_to_read
-            << ", avail_in_: " << avail_in_ << std::endl;
+  DMSG("ReadFromStream(): bytes_to_read: " << bytes_to_read
+                                           << ", avail_in_: " << avail_in_);
   // If there are unread bytes in the input stream we move them to the head
   // of the stream to maximize the space available to read new data into.
   if (avail_in_ > 0) {
@@ -177,12 +198,13 @@ Status ZstdInputStream::ReadFromStream() {
   Status s = input_stream_->ReadNBytes(bytes_to_read, &data);
   memcpy(read_location, data.data(), data.size());
 
-  std::cout << "ReadFromStream(): data: '" << data << "'" << std::endl;
+  DMSG("ReadFromStream(): data: '" << data << "'");
 
   next_in_byte_ = input_buffer_.get();
 
   // Note: data.size() could be different from bytes_to_read.
   avail_in_ += data.size();
+  zstd_input_buffer_.pos = 0;
   zstd_input_buffer_.size = avail_in_;
 
   if (!s.ok() && !errors::IsOutOfRange(s)) {
@@ -194,9 +216,9 @@ Status ZstdInputStream::ReadFromStream() {
   // possible that on the last read there isn't enough data in the stream to
   // fill up the buffer in which case input_stream_->ReadNBytes would return an
   // OutOfRange error.
-  if (data.empty()) {
-    return errors::OutOfRange("EOF reached");
-  }
+  // if (data.empty()) {
+  //   return errors::OutOfRange("EOF reached");
+  // }
   if (errors::IsOutOfRange(s)) {
     return Status::OK();
   }
