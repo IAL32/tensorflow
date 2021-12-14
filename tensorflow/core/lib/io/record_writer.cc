@@ -88,7 +88,11 @@ RecordWriter::RecordWriter(WritableFile* dest,
         new SnappyOutputBuffer(dest, options.snappy_options.input_buffer_size,
                                options.snappy_options.output_buffer_size);
   } else if (IsZstdCompressed(options)) {
-    LOG(FATAL) << "Compression type not fully implemented:" << options.compression_type;
+    ZstdOutputBuffer* zstd_output_buffer = new ZstdOutputBuffer(
+        dest, options.zstd_options.input_buffer_size,
+        options.zstd_options.output_buffer_size, options.zstd_options);
+
+    dest_ = zstd_output_buffer;
   } else if (options.compression_type == RecordWriterOptions::NONE) {
     // Nothing to do
   } else {

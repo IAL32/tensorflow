@@ -26,6 +26,7 @@ limitations under the License.
 #include "tensorflow/core/lib/io/zlib_compression_options.h"
 #include "tensorflow/core/lib/io/zlib_outputbuffer.h"
 #include "tensorflow/core/lib/io/zstd/zstd_compression_options.h"
+#include "tensorflow/core/lib/io/zstd/zstd_outputbuffer.h"
 #endif  // IS_SLIM_BUILD
 #include "tensorflow/core/platform/cord.h"
 #include "tensorflow/core/platform/macros.h"
