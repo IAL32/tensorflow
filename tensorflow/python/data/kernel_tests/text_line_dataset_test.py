@@ -64,8 +64,6 @@ class TextLineDatasetTestBase(test_base.DatasetTestBase):
           contents.append(b"\r\n" if crlf else b"\n")
       contents = b"".join(contents)
 
-      # FIXME: @IAL32
-      # Add ZSTD?
       if not compression_type:
         with open(fn, "wb") as f:
           f.write(contents)
@@ -195,8 +193,6 @@ class TextLineDatasetCheckpointTest(TextLineDatasetTestBase,
     return readers.TextLineDataset(
         test_filenames, compression_type=compression_type, buffer_size=10)
 
-  # FIXME: @IAL32
-  # Add ZSTD?
   @combinations.generate(
       combinations.times(
           test_base.default_test_combinations(),

@@ -103,8 +103,6 @@ class TFCompressionTestCase(test.TestCase):
         writer.write(r)
     return fn
 
-  # FIXME: @IAL32
-  # Add ZSTD?
   def _ZlibCompressFile(self, infile, name="tfrecord.z"):
     # zlib compress the file and write compressed contents to file.
     with open(infile, "rb") as f:
@@ -479,10 +477,6 @@ class FixedLengthRecordReaderTest(TFCompressionTestCase):
       self._GzipCompressFile(fn, fn)
     return filenames
 
-
-  # FIXME: @IAL32
-  # Add ZSTD?
-
   # gap_bytes=hop_bytes-record_bytes
   def _CreateZlibFiles(self, num_records, gap_bytes):
     filenames = self._CreateFiles(num_records, gap_bytes)
@@ -713,6 +707,22 @@ class TFRecordReaderTest(TFCompressionTestCase):
         self.assertTrue(compat.as_text(k).startswith("%s:" % files[i]))
         self.assertAllEqual(self._Record(i, j), v)
 
+  @test_util.run_deprecated_v1
+  def testReadZstdFiles(self):
+    options = tf_record.TFRecordOptions(TFRecordCompressionType.ZSTD)
+    files = self._CreateFiles(options)
+
+    reader = io_ops.TFRecordReader(name="test_reader", options=options)
+    queue = data_flow_ops.FIFOQueue(99, [dtypes.string], shapes=())
+    key, value = reader.read(queue)
+
+    self.evaluate(queue.enqueue_many([files]))
+    self.evaluate(queue.close())
+    for i in range(self._num_files):
+      for j in range(self._num_records):
+        k, v = self.evaluate([key, value])
+        self.assertTrue(compat.as_text(k).startswith("%s:" % files[i]))
+        self.assertAllEqual(self._Record(i, j), v)
 
 class AsyncReaderTest(test.TestCase):
 

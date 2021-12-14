@@ -23,7 +23,6 @@ limitations under the License.
 #include "tensorflow/core/protobuf/error_codes.pb.h"
 
 #include <zstd.h>
-#include <chrono>
 
 namespace tensorflow {
 namespace io {

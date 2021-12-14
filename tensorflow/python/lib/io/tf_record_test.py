@@ -63,8 +63,7 @@ _TEXT = b"""Gaily bedight,
     'If you seek for Eldorado!'
     """
 
-# FIXME: @IAL32
-# Add ZSTD?
+# FIXME(IAL32): Add ZSTD?
 
 class TFCompressionTestCase(test.TestCase):
   """TFCompression Test"""
@@ -291,6 +290,25 @@ class TFRecordWriterTest(TFCompressionTestCase):
           delta == 0 if delta_sign == 0 else delta // delta_sign > 0,
           "Setting {} = {}, file was {} smaller didn't match sign of {}".format(
               prop, value, delta, delta_sign))
+
+  def testZstdCompressionType(self):
+    """test Zstd Compression Type"""
+    zstd_t = tf_record.TFRecordCompressionType.ZSTD
+
+    self.assertEqual(
+        "ZSTD",
+        tf_record.TFRecordOptions.get_compression_type_string(
+            tf_record.TFRecordOptions("ZSTD")))
+
+    self.assertEqual(
+        "ZSTD",
+        tf_record.TFRecordOptions.get_compression_type_string(
+            tf_record.TFRecordOptions(zstd_t)))
+
+    self.assertEqual(
+        "ZSTD",
+        tf_record.TFRecordOptions.get_compression_type_string(
+            tf_record.TFRecordOptions(tf_record.TFRecordOptions(zstd_t))))
 
 
 class TFRecordWriterZlibTest(TFCompressionTestCase):

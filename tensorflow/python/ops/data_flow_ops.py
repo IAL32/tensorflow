@@ -2426,8 +2426,6 @@ class MapStagingArea(BaseStagingArea):
         capacity=self._capacity,
         memory_limit=self._memory_limit)
 
-# FIXME: @IAL32
-# Add ZSTD?
 
 class RecordInput(object):
   """RecordInput asynchronously reads and randomly yields TFRecords.
@@ -2470,8 +2468,8 @@ class RecordInput(object):
         how many batches to create, which are returned as a list when
         `get_yield_op()` is called. An example use case is to split processing
         between devices on one computer.
-      compression_type: The type of compression for the file. Currently ZLIB and
-        GZIP are supported. Defaults to none.
+      compression_type: The type of compression for the file. Currently ZLIB,
+        GZIP and ZSTD are supported. Defaults to none.
 
     Raises:
       ValueError: If one of the arguments is invalid.

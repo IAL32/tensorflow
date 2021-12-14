@@ -484,8 +484,6 @@ def make_csv_dataset_v2(
   # Clean arguments; figure out column names and defaults
   if column_names is None or column_defaults is None:
     # Find out which io function to open the file
-    # FIXME: @IAL32
-    # Add ZSTD?
     file_io_fn = lambda filename: file_io.FileIO(filename, "r")
     if compression_type is not None:
       compression_type_value = tensor_util.constant_value(compression_type)

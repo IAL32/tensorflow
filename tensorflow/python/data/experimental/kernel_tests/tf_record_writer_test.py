@@ -70,8 +70,7 @@ class TFRecordWriterTest(test_base.DatasetTestBase, parameterized.TestCase):
     for i, r in enumerate(tf_record.tf_record_iterator(self._outputFilename())):
       self.assertAllEqual(self._record(i), r)
 
-  # FIXME: @IAL32
-  # Add ZSTD?
+  # TODO(IAL32): finish testing ZSTD
   @combinations.generate(test_base.default_test_combinations())
   def testWriteZLIB(self):
     options = tf_record.TFRecordOptions(tf_record.TFRecordCompressionType.ZLIB)
@@ -86,6 +85,15 @@ class TFRecordWriterTest(test_base.DatasetTestBase, parameterized.TestCase):
     options = tf_record.TFRecordOptions(tf_record.TFRecordCompressionType.GZIP)
     self.evaluate(
         self.writer_fn(self._createFile(options), compression_type="GZIP"))
+    for i, r in enumerate(
+        tf_record.tf_record_iterator(self._outputFilename(), options=options)):
+      self.assertAllEqual(self._record(i), r)
+
+  @combinations.generate(test_base.default_test_combinations())
+  def testWriteZSTD(self):
+    options = tf_record.TFRecordOptions(tf_record.TFRecordCompressionType.ZSTD)
+    self.evaluate(
+        self.writer_fn(self._createFile(options), compression_type="ZSTD"))
     for i, r in enumerate(
         tf_record.tf_record_iterator(self._outputFilename(), options=options)):
       self.assertAllEqual(self._record(i), r)

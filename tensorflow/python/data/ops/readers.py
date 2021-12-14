@@ -244,8 +244,6 @@ class TextLineDatasetV1(dataset_ops.DatasetV1Adapter):
     self._dataset._filenames = value  # pylint: disable=protected-access
 
 
-# FIXME: @IAL32
-# Add ZSTD?
 class _TFRecordDataset(dataset_ops.DatasetSource):
   """A `Dataset` comprising records from one or more TFRecord files."""
 

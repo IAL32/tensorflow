@@ -339,8 +339,7 @@ TEST_F(RecordioTest, ReadErrorWithBuffering) {
   TestReadError(RecordWriterOptions(), options);
 }
 
-// FIXME: @IAL32
-// Add ZSTD?
+// FIXME(IAL32): Add ZSTD support
 TEST_F(RecordioTest, ReadErrorWithCompression) {
   TestReadError(RecordWriterOptions::CreateRecordWriterOptions("ZLIB"),
                 RecordReaderOptions::CreateRecordReaderOptions("ZLIB"));

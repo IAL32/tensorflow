@@ -77,8 +77,6 @@ class RecordInputOpTest(test.TestCase):
       self.assertEqual(self.evaluate(yield_op), b"0000000000")
 
 
-  # FIXME: @IAL32
-  # Add ZSTD?
   def testRecordInputSimpleZlib(self):
     with self.cached_session() as sess:
       self.generateTestData(

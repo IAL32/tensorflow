@@ -102,8 +102,6 @@ class TFRecordDatasetTest(tf_record_test_base.TFRecordTestBase,
           [self._record(j, i) for i in range(self._num_records)])
     self.assertDatasetProduces(dataset, expected_output=expected_output * 10)
 
-  # FIXME: @IAL32
-  # Add ZSTD?
   @combinations.generate(test_base.default_test_combinations())
   def testReadZlibFiles(self):
     zlib_files = []
@@ -185,8 +183,6 @@ class TFRecordDatasetCheckpointTest(tf_record_test_base.TFRecordTestBase,
                                     checkpoint_test_base.CheckpointTestBase,
                                     parameterized.TestCase):
 
-  # FIXME: @IAL32
-  # Add ZSTD?
   def make_dataset(self,
                    num_epochs,
                    batch_size=1,

@@ -36,8 +36,6 @@ static std::vector<int> BufferSizes() {
 
 namespace {
 
-// FIXME: @IAL32
-// Add tests for ZSTD?
 io::RecordReaderOptions GetMatchingReaderOptions(
     const io::RecordWriterOptions& options) {
   if (options.compression_type == io::RecordWriterOptions::ZLIB_COMPRESSION) {
