@@ -20,6 +20,8 @@ limitations under the License.
 #include "tensorflow/core/lib/io/compression.h"
 #include "tensorflow/core/platform/env.h"
 
+#include "tensorflow/core/lib/io/zstd/zstd_outputbuffer.h"
+
 namespace tensorflow {
 namespace io {
 namespace {

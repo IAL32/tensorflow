@@ -1865,7 +1865,6 @@ tf_cc_tests(
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/types:optional",
         "@zlib",
-        "@zstd",
     ],
 )
 

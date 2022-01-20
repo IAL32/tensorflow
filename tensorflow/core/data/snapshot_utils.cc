@@ -36,6 +36,8 @@ limitations under the License.
 #include "tensorflow/core/lib/io/zlib_inputstream.h"
 #include "tensorflow/core/lib/io/zlib_outputbuffer.h"
 #include "tensorflow/core/lib/io/zstd/zstd_compression_options.h"
+#include "tensorflow/core/lib/io/zstd/zstd_inputstream.h"
+#include "tensorflow/core/lib/io/zstd/zstd_outputbuffer.h"
 #include "tensorflow/core/platform/coding.h"
 #include "tensorflow/core/platform/errors.h"
 #include "tensorflow/core/platform/file_system.h"
